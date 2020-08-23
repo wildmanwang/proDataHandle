@@ -1,0 +1,71 @@
+城市信息表：city_info
+	ID：美团ID		erpID
+	名称			name
+
+门店信息表：store_info
+	ID：美团ID		erpID
+	名称			name
+	所在城市		cityID
+	经度			longitude
+	纬度			latitude
+
+订单主表：order_main
+	ID：美团ID		erpID
+	门店ID			storeID
+	下单时间		order_time
+	预计送达时间	estimate_arrival_time
+	餐品就绪时间	prepare_time
+	开始配送时间	delivery_time
+	送达时间		arrival_time
+	结算时间		settle_time
+	消费者ID		consumerID
+	隐私号码1		privacy_phone1
+	隐私号码2		privacy_phone2
+
+订单明细表：order_detail
+	ID				sID
+	订单ID			orderID
+	商品ID：美团ID	itemID
+	商品名称		itemName
+	原价			priceOri
+	实价			price
+	数量			qty
+	单位			unit
+	金额			amt
+
+消费者信息表：consumer_info
+	ID				sID
+	用户号			username
+	昵称			nickname
+	姓名			name
+	性别			gender
+	手机号码		phone
+	城市ID			cityID
+
+送餐地址：delivery_address
+	ID				sID
+	消费者ID		consumeID
+	送餐地址		address
+	收货者名称		recipient_name
+	收货者手机		recipient_phone
+	收货经度		longitude
+	收货维度		latitude
+
+评价主表：comment_main
+	ID：美团IDD		erpID
+	门店ID			storeID
+	评价内容		comment_str
+	订单评分		order_score
+	菜品评分		food_score
+	配送评分		delivery_score
+	包装评分		package_score
+	口味评分		taste_score
+	送达评分		ship_score
+	质量评分		quality_score
+	评价时间		comment_time
+	配送时长		ship_duration
+	超时时长		over_duration
+
+评价商品表：comment_detail
+	评价ID			commentID
+	商品名称		itemName

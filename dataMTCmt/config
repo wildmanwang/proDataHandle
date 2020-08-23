@@ -1,0 +1,15 @@
+[orders]
+host = localhost
+user = root
+password = 0Wangle?
+database = mt_orderinfo
+
+[service]
+host = localhost
+user = root
+password = 0Wangle?
+database = mt_service
+
+[business]
+commentHours = 96
+workInterval = 60

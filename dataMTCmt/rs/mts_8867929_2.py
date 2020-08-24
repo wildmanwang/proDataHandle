@@ -50,7 +50,7 @@ class Handler(BaseHandler):
     }
 
     def __init__(self):
-        self.sDate10StartComment = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=1),"%Y-%m-%d")
+        self.sDate10StartComment = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=3),"%Y-%m-%d")
         self.sDate10EndComment = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=1),"%Y-%m-%d")
 
         self.strParse = []
@@ -225,19 +225,17 @@ class Handler(BaseHandler):
             # 商品明细
             if each["orderStatus"]["details"]:
                 self.detail_page_comment_detail(cID, self.varDict["wmPoiId"], each["ctime"], 1, each["orderStatus"]["details"])
-                if each["showOrderInfo"]:
-                    sSqlH = r"update comment_main set to_time = {to_time} where erpID = {erpID} and to_time > {to_time}".format(
-                            to_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60,
-                            erpID=cID
-                        )
-                    self.data_handle(sSqlJ, False, sSqlH)
+                sSqlH = r"update comment_main set to_time = {to_time} where erpID = {erpID} and to_time > {to_time}".format(
+                        to_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60,
+                        erpID=cID
+                    )
+                self.data_handle(sSqlJ, False, sSqlH)
             else:
-                if each["showOrderInfo"]:
-                    sSqlH = r"update comment_main set from_time = {from_time} where erpID = {erpID} and from_time < {from_time}".format(
-                            from_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60 - 60,
-                            erpID=cID
-                        )
-                    self.data_handle("", False, sSqlH)
+                sSqlH = r"update comment_main set from_time = {from_time} where erpID = {erpID} and from_time < {from_time}".format(
+                        from_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60 - 60,
+                        erpID=cID
+                    )
+                self.data_handle("", False, sSqlH)
             # 点踩
             if len(each["critic_food_list"]) > 0:
                 self.detail_page_comment_detail(cID, self.varDict["wmPoiId"], each["ctime"], 2, each["critic_food_list"])

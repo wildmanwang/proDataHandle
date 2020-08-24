@@ -82,39 +82,53 @@ class InterControl():
 
             # 逐个处理每个门店
             lsSql = r"select erpID, name from store_info where status = 1 order by level desc"
+            ldCol = ["storeID", "name"]
             curOrder.execute(lsSql)
-            rsStore = curOrder.fetchall()
+            rsTmp = curOrder.fetchall()
+            rsStore = [dict(zip(ldCol, line)) for line in rsTmp]
             for rcStore in rsStore:
                 # 检索该门店待处理记录
-                lsSql = r"select erpID, comment_str, order_score, comment_time, ship_duration, over_duration from comment_main " \
+                lsSql = r"select erpID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration from comment_main " \
                         r"where comment_time >= {cmt_time} and storeID = {storeID} and orderID is null".format(
                     cmt_time=timeCmt,
-                    storeID=rcStore[0]
+                    storeID=rcStore["storeID"]
                 )
+                ldCol = ["commentID", "comment_str", "order_score", "comment_time", "from_time", "to_time", "ship_duration", "over_duration"]
                 curOrder.execute(lsSql)
-                rsCmtMain = curOrder.fetchall()
+                rsTmp = curOrder.fetchall()
+                rsCmtMain = [dict(zip(ldCol, line)) for line in rsTmp]
+
                 # 准备好辅助数据
                 lsSql = r"select erpID, storeID, order_time, estimate_arrival_time, delivery_time from order_main " \
                         r"where order_time >= {order_time} and storeID = {storeID} and status = 8".format(
                     order_time=timeOrder,
-                    storeID=rcStore[0]
+                    storeID=rcStore["storeID"]
                 )
+                ldCol = ["orderID", "storeID", "order_time", "estimate_arrival_time", "delivery_time"]
                 curOrder.execute(lsSql)
-                rsOrderMain = curOrder.fetchall()
+                rsTmp = curOrder.fetchall()
+                rsOrderMain = [dict(zip(ldCol, line)) for line in rsTmp]
+
                 lsSql = r"select orderID, itemID, itemName, unit from order_detail " \
                         r"where order_time >= {order_time} and storeID = {storeID}".format(
                     order_time=timeOrder,
-                    storeID=rcStore[0]
+                    storeID=rcStore["storeID"]
                 )
+                ldCol = ["orderID", "itemID", "itemName", "unit"]
                 curOrder.execute(lsSql)
-                rsOrderDetail = curOrder.fetchall()
+                rsTmp = curOrder.fetchall()
+                rsOrderDetail = [dict(zip(ldCol, line)) for line in rsTmp]
+
                 lsSql = r"select commentID, itemSource, itemID, itemName from comment_detail " \
                         r"where comment_time >= {cmt_time} and storeID = {storeID}".format(
                     cmt_time=timeCmt,
-                    storeID=rcStore[0]
+                    storeID=rcStore["storeID"]
                 )
+                ldCol = ["commentID", "itemSource", "itemID", "itemName"]
                 curOrder.execute(lsSql)
-                rsCmtDetial = curOrder.fetchall()
+                rsTmp = curOrder.fetchall()
+                rsCmtDetail = [dict(zip(ldCol, line)) for line in rsTmp]
+
                 for rcCmt in rsCmtMain:
                     lOrder = [i for i in rsOrderMain]
 
@@ -124,12 +138,12 @@ class InterControl():
                         continue
 
                     # 单据商品匹配：数量和名称精确匹配
-                    lOrder = self.stepABillItem(rcCmt, lOrder, rsCmtDetial, rsOrderDetail)
+                    lOrder = self.stepABillItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
                     if len(lOrder) == 0:
                         continue
 
                     # 踩赞商品匹配：商品名称模糊匹配
-                    lOrder = self.stepACommentItem(rcCmt, lOrder, rsCmtDetial, rsOrderDetail)
+                    lOrder = self.stepACommentItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
                     if len(lOrder) == 0:
                         continue
 
@@ -164,25 +178,25 @@ class InterControl():
                             continue
 
                     lsSql = r"delete from handle_data where commentID = {commentID}".format(
-                        commentID=rcCmt[0]
+                        commentID=rcCmt["commentID"]
                     )
                     curService.execute(lsSql)
                     if len(lOrder) == 1:
                         # 找到订单，更新订单关系
                         lsSql = r"update comment_main set orderID={orderID} where erpID={commentID}".format(
-                            orderID=lOrder[0][0],
-                            commentID=rcCmt[0]
+                            orderID=lOrder[0]["orderID"],
+                            commentID=rcCmt["commentID"]
                         )
                         curOrder.execute(lsSql)
                         # 生成通知消息
                         lsSql = r"insert into business_notice ( storeID, commentID, commentDate, order_score, commentStr, orderID, status ) " \
                                 r"values ( {storeID}, {commentID}, '{commentDate}', {order_score}, '{comment_str}', {orderID}, 0 )".format(
-                            storeID=rcStore[0],
-                            commentID=rcCmt[0],
-                            commentDate=rcCmt[3],
-                            order_score=rcCmt[2],
-                            comment_str=rcCmt[1],
-                            orderID=lOrder[0][0]
+                            storeID=rcStore["storeID"],
+                            commentID=rcCmt["commentID"],
+                            commentDate=rcCmt["comment_time"],
+                            order_score=rcCmt["order_score"],
+                            comment_str=rcCmt["comment_str"],
+                            orderID=lOrder[0]["orderID"]
                         )
                         curService.execute(lsSql)
                         # 一单一提交
@@ -192,8 +206,8 @@ class InterControl():
                         # 确定了范围，待下次重新分析，写入临时表
                         for recOrder in lOrder:
                             lsSql = r"insert into handle_data ( commentID, orderID ) values ( {commentID}, {orderID} )".format(
-                                commentID=rcCmt[0],
-                                orderID=recOrder[0]
+                                commentID=rcCmt["commentID"],
+                                orderID=recOrder["orderID"]
                             )
                             curService.execute(lsSql)
                     connService.commit()
@@ -219,11 +233,21 @@ class InterControl():
         :param lOrder: 匹配前订单列表
         :return: 匹配后的订单列表
         """
-        t2 = rcCmt[3]
+        # 下单时间范围
+        tFrom = rcCmt["from_time"]
+        tTo = rcCmt["to_time"]
         for rcTmp in lOrder[::-1]:
-            t1 = rcTmp[4]
-            if not (t1 < t2):
+            t1 = rcTmp["order_time"]
+            if not (t1 > tFrom and t1 < tTo):
                 lOrder.remove(rcTmp)
+
+        # 送达时间<评价时间
+        tCmt = rcCmt["comment_time"]
+        for rcTmp in lOrder[::-1]:
+            t1 = rcTmp["delivery_time"]
+            if not (t1 < tCmt):
+                lOrder.remove(rcTmp)
+
         return lOrder
 
     def stepABillItem(self, rcCmt, lOrder, rsCmtDetail, rsOrderDetail):
@@ -235,16 +259,16 @@ class InterControl():
         :param rsOrderDetail: 订单商品明细
         :return: 匹配后的订单列表
         """
-        lItemCmt = [i for i in rsCmtDetail if (i[0] == rcCmt[0] and i[1] == 1)]
+        lItemCmt = [i for i in rsCmtDetail if (i["commentID"] == rcCmt["commentID"] and i["itemSource"] == 1)]
         if len(lItemCmt) > 0:
             for rcTmp in lOrder[::-1]:
-                lItemOrder = [i for i in rsOrderDetail if (i[0] == rcTmp[0])]
+                lItemOrder = [i for i in rsOrderDetail if (i["orderID"] == rcTmp["orderID"])]
                 bFind = False
                 if len(lItemCmt) == len(lItemOrder):
                     for i in lItemCmt:
                         bFind = False
                         for j in lItemOrder:
-                            if i[3] == j[2]:
+                            if i["itemName"] == j["itemName"]:
                                 bFind = True
                                 break
                         if not bFind:
@@ -262,15 +286,15 @@ class InterControl():
         :param rsOrderDetail: 订单商品明细
         :return: 匹配后的订单列表
         """
-        lItemCmt = [i for i in rsCmtDetail if (i[0] == rcCmt[0] and i[1] > 1)]
+        lItemCmt = [i for i in rsCmtDetail if (i["commentID"] == rcCmt["commentID"] and i["itemSource"] > 1)]
         if len(lItemCmt) > 0:
             for rcTmp in lOrder[::-1]:
-                lItemOrder = [i for i in rsOrderDetail if (i[0] == rcTmp[0])]
+                lItemOrder = [i for i in rsOrderDetail if (i["orderID"] == rcTmp["orderID"])]
                 bFind = False
                 for i in lItemCmt:
                     bFind = False
                     for j in lItemOrder:
-                        if j[2].startswith(i[3]):
+                        if j["itemName"].startswith(i["itemName"]):
                             bFind = True
                             break
                     if not bFind:
@@ -291,29 +315,31 @@ class InterControl():
     def stepBShipTime(self, rcCmt, lOrder):
         """
         配送时长匹配：按分/秒计算；舍尾/舍入/进位
+        配送分钟-4 < 配送时长四舍五入分钟取整 < 配送分钟
         :param rcCmt: 评价主记录
         :param lOrder: 匹配前订单列表
         :return: 匹配后的订单列表
         """
         for rcTmp in lOrder[::-1]:
-            if rcCmt[4] != int((rcTmp[4] - rcTmp[2])/60):
+            if rcCmt["ship_duration"] != int((rcTmp["delivery_time"] - rcTmp["order_time"])/60):
                 lOrder.remove(rcTmp)
         return lOrder
 
     def stepBOverTime(self, rcCmt, lOrder):
         """
         超时时长匹配：按分/秒计算；舍尾/舍入/进位
+        送达时间进位分钟取整-预计送达时间进位分钟取整=超时分钟
         :param rcCmt: 评价主记录
         :param lOrder: 匹配前订单列表
         :return: 匹配后的订单列表
         """
-        if rcCmt[5] > 0:
+        if rcCmt["over_duration"] > 0:
             for rcTmp in lOrder[::-1]:
-                if rcCmt[5] != int((rcTmp[4] - rcTmp[3])/60):
+                if rcCmt["over_duration"] != int((rcTmp["delivery_time"] - rcTmp["estimate_arrival_time"])/60):
                     lOrder.remove(rcTmp)
         else:
             for rcTmp in lOrder[::-1]:
-                if rcTmp[3] < rcTmp[4]:
+                if rcTmp["estimate_arrival_time"] < rcTmp["delivery_time"]:
                     lOrder.remove(rcTmp)
         return lOrder
 
@@ -357,4 +383,4 @@ if __name__ == "__main__":
         print(rtn["info"])
     else:
         print("成功完成评论消息匹配订单的任务.")
-    print("为{num}条评论消息找到原始订单.")
+    print("为{num}条评论消息找到原始订单.".format(num=rtn["dataNumber"]))

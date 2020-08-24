@@ -143,7 +143,6 @@ class Handler(BaseHandler):
                 dateEnd=self.sDate10EndOrder
             )
         self.crawl(sUrl_order, headers=self.headers_order, age=2*60, retries=0, callback=self.index_page)
-        time.sleep(random.randint(30,60))
 
     @config(age=2 * 60)
     def index_page(self, response):

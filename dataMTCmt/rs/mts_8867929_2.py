@@ -129,6 +129,8 @@ class Handler(BaseHandler):
         try:
             cur = self.db.cursor()
             cur.execute("set names utf8mb4")
+            cur.execute("SET CHARACTER SET utf8mb4")
+            cur.execute("SET character_set_connection=utf8mb4")
             if len(sJudge) > 0:
                 cur.execute(sJudge)
                 rsData = cur.fetchall()
@@ -150,6 +152,8 @@ class Handler(BaseHandler):
         try:
             cur = self.db.cursor()
             cur.execute("set names utf8mb4")
+            cur.execute("SET CHARACTER SET utf8mb4")
+            cur.execute("SET character_set_connection=utf8mb4")
             cur.execute(sSelect)
             rsData = cur.fetchall()
         except Exception as e:
@@ -160,7 +164,7 @@ class Handler(BaseHandler):
     def on_start(self):
         self.bConnected = False
         try:
-            self.db = pymysql.connect(host=db_config["host"], user=db_config["user"], password=db_config["password"], database=db_config["dbname"], charset="utf8")
+            self.db = pymysql.connect(host=db_config["host"], user=db_config["user"], password=db_config["password"], database=db_config["dbname"], charset="utf8mb4", use_unicode=True)
             self.bConnected = True
         except Exception as e:
             print(str(e))
@@ -229,7 +233,7 @@ class Handler(BaseHandler):
                         to_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60,
                         erpID=cID
                     )
-                self.data_handle(sSqlJ, False, sSqlH)
+                self.data_handle("", False, sSqlH)
             else:
                 sSqlH = r"update comment_main set from_time = {from_time} where erpID = {erpID} and from_time < {from_time}".format(
                         from_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60 - 60,
@@ -270,6 +274,5 @@ class Handler(BaseHandler):
         """
         """
         if self.bConnected:
-            pass
             self.db.close()
             self.bConnected = False

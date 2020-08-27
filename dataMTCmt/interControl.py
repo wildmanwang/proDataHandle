@@ -6,6 +6,7 @@ __author__ = "Cliff.wang"
 from datetime import datetime, timedelta
 from interMysql import MYSQL
 import time
+import math
 
 class InterControl():
 
@@ -24,9 +25,12 @@ class InterControl():
         OK时间范围匹配：评价起止时间范围
         OK单据商品匹配：数量和名称精确匹配
         OK踩赞商品匹配：商品名称模糊匹配
-        UN配送超时评价：只有配送分差评，配送超时
-        UN配送时长匹配：按分/秒计算；舍尾/舍入/进位
-        UN超时时长匹配：按分/秒计算；舍尾/舍入/进位
+        OK配送时长匹配：按分/秒计算；舍尾/舍入/进位
+        OK超时时长匹配：按分/秒计算；舍尾/舍入/进位
+        【模糊匹配】
+        OK在评价时间前60分钟内送达，只有一个订单
+        OK送达时间和评价时间都在0:00-7:00间，只有一个订单
+        OK不同日期，送达与评价绝对值相差60分钟，只有一个订单
         【优先级规则】
         当日吃完后评价：当日送达10、40、60、120分钟内评价                               +0、10、6、3
         当日口味分差评：只有口味分差评，送达10、40、60、120分钟内评价                     +0、5、3、1
@@ -73,12 +77,10 @@ class InterControl():
             # 评价记录开始时间：今天-1
             timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 1))
             timeCmt = int(time.mktime(time.strptime(timeCmt, "%Y-%m-%d")))
-            timeCmt = 0
 
             # 订单记录开始时间：今天-3
-            timeOrder = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 2))
+            timeOrder = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 3))
             timeOrder = int(time.mktime(time.strptime(timeOrder, "%Y-%m-%d")))
-            timeOrder = 0
 
             # 逐个处理每个门店
             lsSql = r"select erpID, name from store_info where status = 1 order by level desc"
@@ -147,12 +149,6 @@ class InterControl():
                     if len(lOrder) == 0:
                         continue
 
-                    # 配送超时评价：只有配送分差评，配送超时
-                    if len(lOrder) > 1:
-                        lOrder = self.stepBOverComment(rcCmt, lOrder)
-                        if len(lOrder) == 0:
-                            continue
-
                     # 配送时长匹配：按分/秒计算；舍尾/舍入/进位
                     if len(lOrder) > 1:
                         lOrder = self.stepBShipTime(rcCmt, lOrder)
@@ -165,9 +161,15 @@ class InterControl():
                         if len(lOrder) == 0:
                             continue
 
+                    # 单个记录匹配：多种方案
+                    if len(lOrder) > 1:
+                        lOrder = self.stepCMatchOne(rcCmt, lOrder)
+                        if len(lOrder) == 0:
+                            continue
+
                     # 权重经验匹配：给不同的情况设置不同的权重
                     if len(lOrder) > 1:
-                        lOrder = self.stepCByWeight(rcCmt, lOrder)
+                        lOrder = self.stepDByWeight(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
@@ -202,7 +204,7 @@ class InterControl():
                         # 一单一提交
                         connOrder.commit()
                         rtnData["dataNumber"] += 1
-                    elif len(lOrder) > 1 and len(lOrder) <= 3:
+                    elif len(lOrder) > 1 and len(lOrder) <= 3 and 1 == 2:
                         # 确定了范围，待下次重新分析，写入临时表
                         for recOrder in lOrder:
                             lsSql = r"insert into handle_data ( commentID, orderID ) values ( {commentID}, {orderID} )".format(
@@ -235,6 +237,8 @@ class InterControl():
         """
         # 下单时间范围
         tFrom = rcCmt["from_time"]
+        # 2次出现过了48小时评价还没出现明细商品的情况，超时在30分钟内，把时长放开到60分钟
+        tFrom -= 60 * 60
         tTo = rcCmt["to_time"]
         for rcTmp in lOrder[::-1]:
             t1 = rcTmp["order_time"]
@@ -303,15 +307,6 @@ class InterControl():
                     lOrder.remove(rcTmp)
         return lOrder
 
-    def stepBOverComment(self, rcCmt, lOrder):
-        """
-        配送超时评价：只有配送分差评，配送超时
-        :param rcCmt:
-        :param lOrder:
-        :return:
-        """
-        return lOrder
-
     def stepBShipTime(self, rcCmt, lOrder):
         """
         配送时长匹配：按分/秒计算；舍尾/舍入/进位
@@ -321,7 +316,9 @@ class InterControl():
         :return: 匹配后的订单列表
         """
         for rcTmp in lOrder[::-1]:
-            if rcCmt["ship_duration"] != int((rcTmp["delivery_time"] - rcTmp["order_time"])/60):
+            # 计算配送时长：向上取整：2/59例外
+            iShip = math.ceil((rcTmp["delivery_time"] - rcTmp["order_time"])/60)
+            if rcCmt["ship_duration"] < iShip - 5 or rcCmt["ship_duration"] > iShip:
                 lOrder.remove(rcTmp)
         return lOrder
 
@@ -335,7 +332,9 @@ class InterControl():
         """
         if rcCmt["over_duration"] > 0:
             for rcTmp in lOrder[::-1]:
-                if rcCmt["over_duration"] != int((rcTmp["delivery_time"] - rcTmp["estimate_arrival_time"])/60):
+                # 计算超时时长：向上取整：0/13例外
+                iShip = math.ceil((rcTmp["delivery_time"] - rcTmp["estimate_arrival_time"]) / 60)
+                if rcCmt["over_duration"] != iShip:
                     lOrder.remove(rcTmp)
         else:
             for rcTmp in lOrder[::-1]:
@@ -343,7 +342,34 @@ class InterControl():
                     lOrder.remove(rcTmp)
         return lOrder
 
-    def stepCByWeight(self, rcCmt, lOrder):
+    def stepCMatchOne(self, rcCmt, lOrder):
+        """
+        单个记录匹配：多种方案
+        :param rcCmt:
+        :param lOrder:
+        :return:
+        """
+        # 变量定义
+        tCmt = rcCmt["comment_time"]
+
+        # 在评价时间前60分钟内送达，只有一个订单
+        lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 60 * 60)]
+        if len(lTmp) == 1:
+            return lTmp
+
+        # 送达时间和评价时间都在0:00-7:00间，只有一个订单
+        lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 7 * 60 * 60 and self._getHour(tCmt) >= 0 and self._getHour(tCmt) <= 7 and self._getHour(i["delivery_time"]) >= 0 and self._getHour(i["delivery_time"]) <= 7)]
+        if len(lTmp) == 1:
+            return lTmp
+
+        # 不同日期，送达与评价绝对值相差60分钟，只有一个订单
+        lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] > 7 * 60 * 60 and abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 1 * 60 * 60)]
+        if len(lTmp) == 1:
+            return lTmp
+
+        return lOrder
+
+    def stepDByWeight(self, rcCmt, lOrder):
         """
         权重经验匹配：给不同的情况设置不同的权重
         :param rcCmt:
@@ -369,6 +395,13 @@ class InterControl():
         3 删除数据前按月统计完成率
         """
         pass
+
+    def _getHour(self, iTime):
+        """
+        获取时间戳小时
+        :return:
+        """
+        return int(time.strftime("%H", time.localtime(iTime)))
 
 if __name__ == "__main__":
     import os

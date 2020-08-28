@@ -77,10 +77,12 @@ class InterControl():
             # 评价记录开始时间：今天-1
             timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 1))
             timeCmt = int(time.mktime(time.strptime(timeCmt, "%Y-%m-%d")))
+            timeCmt = 0
 
             # 订单记录开始时间：今天-3
             timeOrder = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 3))
             timeOrder = int(time.mktime(time.strptime(timeOrder, "%Y-%m-%d")))
+            timeOrder = 0
 
             # 逐个处理每个门店
             lsSql = r"select erpID, name from store_info where status = 1 order by level desc"
@@ -102,7 +104,7 @@ class InterControl():
 
                 # 准备好辅助数据
                 lsSql = r"select erpID, storeID, order_time, estimate_arrival_time, delivery_time from order_main " \
-                        r"where order_time >= {order_time} and storeID = {storeID} and status = 8".format(
+                        r"where order_time >= {order_time} and storeID = {storeID} and status = 8 and matched = 0".format(
                     order_time=timeOrder,
                     storeID=rcStore["storeID"]
                 )
@@ -190,6 +192,13 @@ class InterControl():
                             commentID=rcCmt["commentID"]
                         )
                         curOrder.execute(lsSql)
+                        # 更新订单匹配标志
+                        lsSql = r"update order_main set matched=1 where erpID={orderID}".format(
+                            orderID=lOrder[0]["orderID"]
+                        )
+                        curOrder.execute(lsSql)
+                        # 把已匹配的订单从备选订单中删除
+                        rsOrderMain.remove(lOrder[0])
                         # 生成通知消息
                         lsSql = r"insert into business_notice ( storeID, commentID, commentDate, order_score, commentStr, orderID, status ) " \
                                 r"values ( {storeID}, {commentID}, '{commentDate}', {order_score}, '{comment_str}', {orderID}, 0 )".format(
@@ -318,7 +327,8 @@ class InterControl():
         for rcTmp in lOrder[::-1]:
             # 计算配送时长：向上取整：2/59例外
             iShip = math.ceil((rcTmp["delivery_time"] - rcTmp["order_time"])/60)
-            if rcCmt["ship_duration"] < iShip - 5 or rcCmt["ship_duration"] > iShip:
+            # 订单配送时间相对评价配送时间范围：向下5分钟，向上1分钟
+            if iShip <= rcCmt["ship_duration"] - 5 or iShip > rcCmt["ship_duration"] + 1:
                 lOrder.remove(rcTmp)
         return lOrder
 
@@ -351,21 +361,25 @@ class InterControl():
         """
         # 变量定义
         tCmt = rcCmt["comment_time"]
+        lTmp = []
 
         # 在评价时间前60分钟内送达，只有一个订单
-        lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 60 * 60)]
-        if len(lTmp) == 1:
-            return lTmp
+        if len(lTmp) == 0:
+            lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 60 * 60)]
+            if len(lTmp) == 1:
+                return lTmp
 
         # 送达时间和评价时间都在0:00-7:00间，只有一个订单
-        lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 7 * 60 * 60 and self._getHour(tCmt) >= 0 and self._getHour(tCmt) <= 7 and self._getHour(i["delivery_time"]) >= 0 and self._getHour(i["delivery_time"]) <= 7)]
-        if len(lTmp) == 1:
-            return lTmp
+        if len(lTmp) == 0:
+            lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 7 * 60 * 60 and self._getHour(tCmt) >= 0 and self._getHour(tCmt) <= 7 and self._getHour(i["delivery_time"]) >= 0 and self._getHour(i["delivery_time"]) <= 7)]
+            if len(lTmp) == 1:
+                return lTmp
 
         # 不同日期，送达与评价绝对值相差60分钟，只有一个订单
-        lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] > 7 * 60 * 60 and abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 1 * 60 * 60)]
-        if len(lTmp) == 1:
-            return lTmp
+        if len(lTmp) == 0:
+            lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] > 7 * 60 * 60 and abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 1 * 60 * 60)]
+            if len(lTmp) == 1:
+                return lTmp
 
         return lOrder
 

@@ -16,24 +16,9 @@ import datetime, time
 import random
 import pymysql
 
-COOKIE_ORDER = r"_lxsdk_cuid=172ff28d6a6c8-046a7ed55deba9-5d462912-1fa400-172ff28d6a6c8; ci=30; rvct=30; " \
-    r"device_uuid=!9c8e93c5-c909-4a89-9ec7-f6f7af88bfd7; uuid_update=true; acctId=69702070; brandId=-1; " \
-    r"wmPoiId=8867929; isOfflineSelfOpen=0; city_id=440307; isChain=0; existBrandPoi=false; " \
-    r"ignore_set_router_proxy=false; region_id=1000440300; region_version=1586416007; newCategory=false; " \
-    r"logistics_support=1; cityId=440300; provinceId=440000; city_location_id=440300; location_id=440307; " \
-    r"pushToken=0ppHHkDn1TwPEytvO3-DQbs_P25JbKCAxdQUHu8xL2d8*; _lxsdk=172ff28d6a6c8-046a7ed55deba9-5d462912-1fa400-172ff28d6a6c8; " \
-    r"bsid=hXikqjd__8HzkBEdQ3Na2GOMbWoWHGdATAO0oOle0H82yoQk6bTS14nvFnHswlJAeS3L3MlIbvW4yg2YCUa-JQ; token=073owTRp7D7bEJkbMdNgeP35qw-WD5W9iLGU87bkCw9g*; " \
-    r"wpush_server_url=wss://wpush.meituan.com; shopCategory=food; logan_custom_report=; " \
-    r"set_info=%7B%22wmPoiId%22%3A8867929%2C%22region_id%22%3A%221000440300%22%2C%22region_version%22%3A1586416007%7D; " \
-    r"setPrivacyTime=1_20200821; logan_session_token=ofpanm4w8pu694rwrppe; " \
-    r"JSESSIONID=1g34pl0vkrlamxvslypobquak; _lxsdk_s=1740f15f4e3-1d4-c87-829%7C69702070%7C6"
+COOKIE_ORDER = r"_lxsdk_cuid=172ff28d6a6c8-046a7ed55deba9-5d462912-1fa400-172ff28d6a6c8; ci=30; rvct=30; device_uuid=!9c8e93c5-c909-4a89-9ec7-f6f7af88bfd7; uuid_update=true; acctId=69702070; brandId=-1; wmPoiId=8867929; isOfflineSelfOpen=0; city_id=440307; isChain=0; existBrandPoi=false; ignore_set_router_proxy=false; region_id=1000440300; region_version=1586416007; newCategory=false; logistics_support=1; cityId=440300; provinceId=440000; city_location_id=440300; location_id=440307; pushToken=0ppHHkDn1TwPEytvO3-DQbs_P25JbKCAxdQUHu8xL2d8*; _lxsdk=172ff28d6a6c8-046a7ed55deba9-5d462912-1fa400-172ff28d6a6c8; wpush_server_url=wss://wpush.meituan.com; shopCategory=food; logan_custom_report=; bsid=qXqkpeJB7eUygZ-ROc0I-o39HjxyKetgmAF82unErJFXHh_KagGUyGOTJ58u6IoGcfk1z1SoOKc-cY10HrO6vg; token=0Zi2G0xnVI2Rw3CU54XKk4qFebkUQ1925Axykyc4fWbU*; set_info=%7B%22wmPoiId%22%3A8867929%2C%22region_id%22%3A%221000440300%22%2C%22region_version%22%3A1586416007%7D; setPrivacyTime=1_20200828; logan_session_token=ktom0czjaqbt7xyf3vrq; JSESSIONID=ybglvnqsoam1vpsson0623vz; _lxsdk_s=17432c5aff8-258-c49-184%7C%7C28"
 
-COOKIE_COMMENT = r"_lxsdk_cuid=172ff28d6a6c8-046a7ed55deba9-5d462912-1fa400-172ff28d6a6c8; ci=30; rvct=30; " \
-    r"acctId=69702070; wmPoiId=8867929; bizad_cityId=440307; bizad_second_city_id=440300; bizad_third_city_id=440307; " \
-    r"wmPoiName=%E7%89%9B%E5%AE%B6%E4%BA%BA%E5%A4%A7%E7%A2%97%E7%89%9B%E8%82%89%E9%9D%A2%EF%BC%88%E5%B8%83%E5%90%89%E9%BB%91%E9%87%91%E5%BA%97%EF%BC%89; " \
-    r"_lxsdk=172ff28d6a6c8-046a7ed55deba9-5d462912-1fa400-172ff28d6a6c8; uuid=4fb8048b12d00dc0ee8b.1594726664.1.0.0; " \
-    r"bsid=hXikqjd__8HzkBEdQ3Na2GOMbWoWHGdATAO0oOle0H82yoQk6bTS14nvFnHswlJAeS3L3MlIbvW4yg2YCUa-JQ; token=073owTRp7D7bEJkbMdNgeP35qw-WD5W9iLGU87bkCw9g*; " \
-    r"_lxsdk_s=1740f15f4e3-1d4-c87-829%7C69702070%7C13"
+COOKIE_COMMENT = r"_lxsdk_cuid=172ff28d6a6c8-046a7ed55deba9-5d462912-1fa400-172ff28d6a6c8; ci=30; rvct=30; wmPoiId=8867929; acctId=69702070; bizad_cityId=440307; bizad_second_city_id=440300; bizad_third_city_id=440307; wmPoiName=%E7%89%9B%E5%AE%B6%E4%BA%BA%E5%A4%A7%E7%A2%97%E7%89%9B%E8%82%89%E9%9D%A2%EF%BC%88%E5%B8%83%E5%90%89%E9%BB%91%E9%87%91%E5%BA%97%EF%BC%89; _lxsdk=172ff28d6a6c8-046a7ed55deba9-5d462912-1fa400-172ff28d6a6c8; uuid=4fb8048b12d00dc0ee8b.1594726664.1.0.0; token=0Zi2G0xnVI2Rw3CU54XKk4qFebkUQ1925Axykyc4fWbU*; bsid=qXqkpeJB7eUygZ-ROc0I-o39HjxyKetgmAF82unErJFXHh_KagGUyGOTJ58u6IoGcfk1z1SoOKc-cY10HrO6vg; _lxsdk_s=17432c5aff8-258-c49-184%7C%7C36"
 
 db_config = {
     "host": "localhost",

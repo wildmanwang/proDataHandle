@@ -1,28 +1,32 @@
 select sID, erpID, ship_duration, comment_time, userName, comment_str, order_score, taste_score, delivery_score from mt_orderinfo.comment_main where left(from_unixtime(comment_time), 10) >= '2020-08-26' order by sID desc;
-select sID, userName, comment_str, order_score, food_score, taste_score, delivery_score, package_score, comment_time, from_time, to_time, ship_duration, over_duration from comment_main where erpID = 3608017670;
-select * from comment_detail where commentID = 3610431631;
+select sID, userName, comment_str, order_score, food_score, taste_score, delivery_score, package_score, comment_time, from_time, to_time, ship_duration, over_duration from comment_main where erpID = 3627266568;
+select * from comment_detail where commentID = 3627266568;
 select	erpID, 
 		from_unixtime(order_time) 下单时间,
 		from_unixtime(delivery_time) 送达时间,
-		from_unixtime(1598203785) 评价时间,
+		from_unixtime(1598799321) 评价时间,
 		(estimate_arrival_time - order_time)/60 预计时长,
 		(delivery_time - order_time)/60 实际时长（按秒）,
+        ceil((delivery_time - order_time)/60) 实际时长（按秒进位）,
 		floor(delivery_time/60) - floor(order_time/60) 实际时长（按分舍尾）,
 		round(delivery_time/60) - round(order_time/60) 实际时长（按分舍入）,
 		ceil(delivery_time/60) - ceil(order_time/60) 实际时长（按分进位）,
-        (((1598203785 - delivery_time)/60)/60)/24 收到多久评价,
-        (1598203785 - delivery_time)/60 收到多久评价 
-from order_main where delivery_time < 1598203785 and erpID in (select orderID from t2) and delivery_time - order_time >= 24 * 60 and delivery_time - order_time < 29 * 60 and estimate_arrival_time > delivery_time;
-from order_main where delivery_time < 1598365719 and order_time between 1598326955 and 1598365719 and delivery_time - order_time > 31 * 60 and delivery_time - order_time < 36 * 60 and estimate_arrival_time > delivery_time
-from order_main where erpID = 88679290890902196;
+        (((1598799321 - delivery_time)/60)/60)/24 收到多久评价,
+        (1598799321 - delivery_time)/60 收到多久评价 
+from order_main where delivery_time < 1598799321 and order_time between 1598665515 and 1598799321 and delivery_time - order_time > 42 * 60 and delivery_time - order_time < 48 * 60 and estimate_arrival_time < delivery_time
+from order_main where delivery_time < 1598723367 and erpID in (select orderID from t2) and delivery_time - order_time >= 29 * 60 and delivery_time - order_time < 35 * 60 and estimate_arrival_time < delivery_time;
+from order_main where erpID = 88679291308600109;
 and abs((((1598195195 - delivery_time)/60)/60)/24 - round((((1598195195 - delivery_time)/60)/60)/24)) < 0.1 order by abs((((1598195195 - delivery_time)/60)/60)/24 - round((((1598195195 - delivery_time)/60)/60)/24)) asc;
 and (estimate_arrival_time - order_time)/60 between 46 and 48
 select * from order_detail where orderID in (select orderID from t2) and itemName like '招牌！香辣牛肉面（大）（辣）%';
 select erpID, from_unixtime(order_time), num from order_main where erpID = 88679290066038059;
-select * from order_main where erpID = 88679292742235259;
-select * from order_detail where orderID in (88679290890902196);
+select * from order_main where erpID = 88679291515054965;
+select * from order_detail where orderID in (88679292318167656);
 
-招牌！香辣牛肉面（大）（不辣）
+招牌！香辣牛肉面（大）
+【可口可乐】(需配面条，单点不送哦）
+地道烤肉肠（1根）（单点不送）
+收藏❥店铺，你敢点我敢送【每天不重样】（每单只限1份哦）
 
 truncate table t1;
 truncate table t2;
@@ -31,8 +35,8 @@ select * from t1;
 select * from t2;
 
 insert t2( orderID ) 
-select distinct orderID from mt_orderinfo.order_detail where order_time between 0 and 1598194499 and orderID in (select orderID from t1) and itemName like '招牌！香辣牛肉面（大）（不辣）';
-select distinct orderID from mt_orderinfo.order_detail where order_time between 0 and 1598194499 group by orderID having count(*) = 1;
+select distinct orderID from mt_orderinfo.order_detail where order_time between 1598665515 and 1598723367 and orderID in (select orderID from t1) and itemName like '地道烤肉肠（1根）（单点不送）%';
+select distinct orderID from mt_orderinfo.order_detail where order_time between 1598665515 and 1598723367 group by orderID having count(*) >= 4;
 
 update mt_orderinfo.comment_main set orderID = 0 where sID = 1;
 

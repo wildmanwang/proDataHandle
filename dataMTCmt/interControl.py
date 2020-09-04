@@ -74,8 +74,8 @@ class InterControl():
             ibConnService = True
             curService = connService.cursor()
 
-            # 评价记录开始时间：今天-1
-            timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 1))
+            # 评价记录开始时间：今天-3
+            timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 3))
             timeCmt = int(time.mktime(time.strptime(timeCmt, "%Y-%m-%d")))
 
             # 订单记录开始时间：今天-14
@@ -133,50 +133,51 @@ class InterControl():
 
                 for rcCmt in rsCmtMain:
                     lOrder = [i for i in rsOrderMain]
+                    iFlag = 0
                     sInfo = ""
 
                     # 时间范围匹配：评价起止时间范围
-                    lOrder, sInfo = self.stepABillTime(rcCmt, lOrder)
+                    lOrder, iFlag, sInfo = self.stepABillTime(rcCmt, lOrder)
                     if len(lOrder) == 0:
                         continue
 
                     # 单据商品匹配：数量和名称精确匹配
-                    lOrder, sInfo = self.stepBBillItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
+                    lOrder, iFlag, sInfo = self.stepBBillItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
                     if len(lOrder) == 0:
                         continue
 
                     # 踩赞商品匹配：商品名称模糊匹配
-                    lOrder, sInfo = self.stepCCommentItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
+                    lOrder, iFlag, sInfo = self.stepCCommentItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
                     if len(lOrder) == 0:
                         continue
 
                     # 配送时长匹配：按分/秒计算；舍尾/舍入/进位
                     if len(lOrder) > 1:
-                        lOrder, sInfo = self.stepDShipTime(rcCmt, lOrder)
+                        lOrder, iFlag, sInfo = self.stepDShipTime(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
                     # 超时时长匹配：按分/秒计算；舍尾/舍入/进位
                     if len(lOrder) > 1:
-                        lOrder, sInfo = self.stepEOverTime(rcCmt, lOrder)
+                        lOrder, iFlag, sInfo = self.stepEOverTime(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
                     # 单个记录匹配：多种方案
                     if len(lOrder) > 1:
-                        lOrder, sInfo = self.stepXMatchOne(rcCmt, lOrder)
+                        lOrder, iFlag, sInfo = self.stepXMatchOne(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
                     # 权重经验匹配：给不同的情况设置不同的权重
                     if len(lOrder) > 1:
-                        lOrder, sInfo = self.stepYByWeight(rcCmt, lOrder)
+                        lOrder, iFlag, sInfo = self.stepYByWeight(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
                     # 终极排序匹配：按指定规则获取一个结果
                     if len(lOrder) > 1:
-                        lOrder, sInfo = self.stepZFinal(rcCmt, lOrder)
+                        lOrder, iFlag, sInfo = self.stepZFinal(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
@@ -192,15 +193,16 @@ class InterControl():
                         )
                         curOrder.execute(lsSql)
                         # 更新订单匹配标志
-                        lsSql = r"update order_main set matched=1 where erpID={orderID}".format(
-                            orderID=lOrder[0]["orderID"]
-                        )
-                        curOrder.execute(lsSql)
+                        if iFlag == 1:
+                            lsSql = r"update order_main set matched=1 where erpID={orderID}".format(
+                                orderID=lOrder[0]["orderID"]
+                            )
+                            curOrder.execute(lsSql)
                         # 把已匹配的订单从备选订单中删除
                         rsOrderMain.remove(lOrder[0])
                         # 生成通知消息
-                        lsSql = r"insert into business_notice ( storeID, commentID, comment_time, order_score, commentStr, orderID, order_time, delivery_time, status, remark ) " \
-                                r"values ( {storeID}, {commentID}, {comment_time}, {order_score}, '{comment_str}', {orderID}, {order_time}, {delivery_time}, 0, {remark} )".format(
+                        lsSql = r"insert into business_notice ( storeID, commentID, comment_time, order_score, commentStr, orderID, order_time, delivery_time, sure_flag, status, remark ) " \
+                                r"values ( {storeID}, {commentID}, {comment_time}, {order_score}, '{comment_str}', {orderID}, {order_time}, {delivery_time}, {sure_flag}, 0, '{remark}' )".format(
                             storeID=rcStore["storeID"],
                             commentID=rcCmt["commentID"],
                             comment_time=rcCmt["comment_time"],
@@ -209,6 +211,7 @@ class InterControl():
                             orderID=lOrder[0]["orderID"],
                             order_time=lOrder[0]["order_time"],
                             delivery_time=lOrder[0]["delivery_time"],
+                            sure_flag=iFlag,
                             remark=sInfo
                         )
                         curService.execute(lsSql)
@@ -264,7 +267,7 @@ class InterControl():
             if not (t1 < tCmt):
                 lOrder.remove(rcTmp)
 
-        return lOrder, "A：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 1, "A：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepBBillItem(self, rcCmt, lOrder, rsCmtDetail, rsOrderDetail):
         """
@@ -292,7 +295,7 @@ class InterControl():
                             break
                 if not bFind:
                     lOrder.remove(rcTmp)
-        return lOrder, "B：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 1, "B：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepCCommentItem(self, rcCmt, lOrder, rsCmtDetail, rsOrderDetail):
         """
@@ -319,7 +322,7 @@ class InterControl():
                         break
                 if not bFind:
                     lOrder.remove(rcTmp)
-        return lOrder, "C：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 1, "C：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepDShipTime(self, rcCmt, lOrder):
         """
@@ -336,7 +339,7 @@ class InterControl():
             # 订单配送时间相对评价配送时间范围：向下5分钟，向上1分钟
             if iShip <= rcCmt["ship_duration"] - 5 or iShip > rcCmt["ship_duration"] + 1:
                 lOrder.remove(rcTmp)
-        return lOrder, "D：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 1, "D：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepEOverTime(self, rcCmt, lOrder):
         """
@@ -357,7 +360,7 @@ class InterControl():
             for rcTmp in lOrder[::-1]:
                 if rcTmp["estimate_arrival_time"] < rcTmp["delivery_time"]:
                     lOrder.remove(rcTmp)
-        return lOrder, "E：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 1, "E：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepXMatchOne(self, rcCmt, lOrder):
         """
@@ -367,7 +370,7 @@ class InterControl():
         :return:
         """
         iCnt = len(lOrder)
-        sInfo = "X:"
+        sInfo = ""
         # 变量定义
         tCmt = rcCmt["comment_time"]
         lTmp = []
@@ -375,42 +378,47 @@ class InterControl():
         # 在评价时间前60分钟内送达，只有一个订单
         if len(lTmp) == 0:
             lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 60 * 60)]
+            sInfo += "X-1-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
             if len(lTmp) == 1:
-                return lTmp, "X-1-1：{num1}/{num2}".format(num1=len(lTmp), num2=iCnt)
-            else:
-                sInfo += "1-1-{num1}/{num2}；".format(num1=len(lTmp), num2=iCnt)
-                if len(lTmp) > 1:
-                    # 送达30秒后评价更常见
-                    lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] >= 30)]
+                return lTmp, 1, sInfo
+            elif len(lTmp) > 1:
+                # 送达30秒后评价更常见
+                lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] >= 30)]
+                sInfo += "X-1-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+                if len(lTmp) == 1:
+                    return lTmp, 1, sInfo
+                elif len(lTmp) > 1:
+                    # 30分钟内评价更常见
+                    lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] <= 30 * 60)]
+                    sInfo += "X-1-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
                     if len(lTmp) == 1:
-                        return lTmp, "X-1-2：{num1}/{num2}".format(num1=len(lTmp), num2=iCnt)
-                    else:
-                        sInfo += "1-2-{num1}/{num2}；".format(num1=len(lTmp), num2=iCnt)
-                        if len(lTmp) > 1:
-                            # 30分钟内评价更常见
-                            lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] <= 30 * 60)]
-                            if len(lTmp) == 1:
-                                return lTmp, "X-1-3：{num1}/{num2}".format(num1=len(lTmp), num2=iCnt)
-                            else:
-                                sInfo += "1-3-{num1}/{num2}；".format(num1=len(lTmp), num2=iCnt)
+                        return lTmp, 1, sInfo
 
-        # 送达时间和评价时间都在0:00-7:00间，只有一个订单
+        # 送达时间和评价时间都在当天0:00-7:00间，只有一个订单
         if len(lTmp) == 0:
             lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 7 * 60 * 60 and self._getHour(tCmt) >= 0 and self._getHour(tCmt) <= 7 and self._getHour(i["delivery_time"]) >= 0 and self._getHour(i["delivery_time"]) <= 7)]
+            sInfo += "X-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
             if len(lTmp) == 1:
-                return lTmp, "X-2：{num1}/{num2}".format(num1=len(lTmp), num2=iCnt)
-            else:
-                sInfo += "2-{num1}/{num2}；".format(num1=len(lTmp), num2=iCnt)
+                return lTmp, 1, sInfo
 
-        # 不同日期，送达与评价绝对值相差60分钟，只有一个订单
+        # 不同日期，日期相差不过7天，送达与评价绝对值相差指定时长内，只有一个订单
         if len(lTmp) == 0:
-            lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] > 7 * 60 * 60 and abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 1 * 60 * 60)]
+            lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] > 7 * 60 * 60 and tCmt - i["delivery_time"] < (7 * 24 + 1) * 60 * 60 and abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 90 * 60)]
+            sInfo += "X-3-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
             if len(lTmp) == 1:
-                return lTmp, "X-3：{num1}/{num2}".format(num1=len(lTmp), num2=iCnt)
-            else:
-                sInfo += "3-{num1}/{num2}；".format(num1=len(lTmp), num2=iCnt)
+                return lTmp, 0, sInfo
+            elif len(lTmp) > 1:
+                lTmp = [i for i in lTmp if (abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 60 * 60)]
+                sInfo += "X-3-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+                if len(lTmp) == 1:
+                    return lTmp, 0, sInfo
+                elif len(lTmp) > 1:
+                    lTmp = [i for i in lTmp if (abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 30 * 60)]
+                    sInfo += "X-3-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+                    if len(lTmp) == 1:
+                        return lTmp, 0, sInfo
 
-        return lOrder, sInfo
+        return lOrder, 0, sInfo
 
     def stepYByWeight(self, rcCmt, lOrder):
         """
@@ -420,7 +428,7 @@ class InterControl():
         :return:
         """
         iCnt = len(lOrder)
-        return lOrder, "Y：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 0, "Y：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepZFinal(self, rcCmt, lOrder):
         """
@@ -430,7 +438,7 @@ class InterControl():
         :return:
         """
         iCnt = len(lOrder)
-        return lOrder, "Z：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 0, "Z：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def histroyHandle(self):
         """

@@ -74,21 +74,24 @@ class InterControl():
             ibConnService = True
             curService = connService.cursor()
 
-            # 评价记录开始时间：今天-3
-            timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 7))
-            timeCmt = int(time.mktime(time.strptime(timeCmt, "%Y-%m-%d")))
-
-            # 订单记录开始时间：今天-14
-            timeOrder = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 14))
-            timeOrder = int(time.mktime(time.strptime(timeOrder, "%Y-%m-%d")))
-
             # 逐个处理每个门店
-            lsSql = r"select erpID, name from store_info where status = 1 order by level desc"
-            ldCol = ["storeID", "name"]
+            lsSql = r"select erpID, name, initFlag from store_info where status = 1 order by level desc"
+            ldCol = ["storeID", "name", "initFlag"]
             curOrder.execute(lsSql)
             rsTmp = curOrder.fetchall()
             rsStore = [dict(zip(ldCol, line)) for line in rsTmp]
             for rcStore in rsStore:
+                # 评价记录开始时间：今天-3
+                if rcStore["initFlag"] == 0:
+                    timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 7))
+                else:
+                    timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 3))
+                timeCmt = int(time.mktime(time.strptime(timeCmt, "%Y-%m-%d")))
+
+                # 订单记录开始时间：今天-14
+                timeOrder = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 14))
+                timeOrder = int(time.mktime(time.strptime(timeOrder, "%Y-%m-%d")))
+
                 # 检索该门店待处理记录
                 lsSql = r"select erpID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration from comment_main " \
                         r"where comment_time >= {cmt_time} and storeID = {storeID} and orderID is null order by comment_time".format(
@@ -101,12 +104,12 @@ class InterControl():
                 rsCmtMain = [dict(zip(ldCol, line)) for line in rsTmp]
 
                 # 准备好辅助数据
-                lsSql = r"select erpID, storeID, order_time, estimate_arrival_time, delivery_time from order_main " \
+                lsSql = r"select erpID, num, order_time, estimate_arrival_time, delivery_time from order_main " \
                         r"where order_time >= {order_time} and storeID = {storeID} and status = 8 and matched = 0 order by order_time".format(
                     order_time=timeOrder,
                     storeID=rcStore["storeID"]
                 )
-                ldCol = ["orderID", "storeID", "order_time", "estimate_arrival_time", "delivery_time"]
+                ldCol = ["orderID", "num", "order_time", "estimate_arrival_time", "delivery_time"]
                 curOrder.execute(lsSql)
                 rsTmp = curOrder.fetchall()
                 rsOrderMain = [dict(zip(ldCol, line)) for line in rsTmp]
@@ -200,21 +203,23 @@ class InterControl():
                             curOrder.execute(lsSql)
                         # 把已匹配的订单从备选订单中删除
                         rsOrderMain.remove(lOrder[0])
-                        # 生成通知消息
-                        lsSql = r"insert into business_notice ( storeID, commentID, comment_time, order_score, commentStr, orderID, order_time, delivery_time, sure_flag, status, remark ) " \
-                                r"values ( {storeID}, {commentID}, {comment_time}, {order_score}, '{comment_str}', {orderID}, {order_time}, {delivery_time}, {sure_flag}, 0, '{remark}' )".format(
-                            storeID=rcStore["storeID"],
-                            commentID=rcCmt["commentID"],
-                            comment_time=rcCmt["comment_time"],
-                            order_score=rcCmt["order_score"],
-                            comment_str=rcCmt["comment_str"],
-                            orderID=lOrder[0]["orderID"],
-                            order_time=lOrder[0]["order_time"],
-                            delivery_time=lOrder[0]["delivery_time"],
-                            sure_flag=iFlag,
-                            remark=sInfo
-                        )
-                        curService.execute(lsSql)
+                        # 差评生成通知消息
+                        if rcCmt["order_score"] < 3:
+                            lsSql = r"insert into business_notice ( storeID, commentID, comment_time, order_score, commentStr, orderNum, orderID, order_time, delivery_time, sure_flag, status, remark ) " \
+                                    r"values ( {storeID}, {commentID}, {comment_time}, {order_score}, '{comment_str}', {orderNum}, {orderID}, {order_time}, {delivery_time}, {sure_flag}, 0, '{remark}' )".format(
+                                storeID=rcStore["storeID"],
+                                commentID=rcCmt["commentID"],
+                                comment_time=rcCmt["comment_time"],
+                                order_score=rcCmt["order_score"],
+                                comment_str=rcCmt["comment_str"],
+                                orderNum=lOrder[0]["num"],
+                                orderID=lOrder[0]["orderID"],
+                                order_time=lOrder[0]["order_time"],
+                                delivery_time=lOrder[0]["delivery_time"],
+                                sure_flag=iFlag,
+                                remark=sInfo
+                            )
+                            curService.execute(lsSql)
                         # 一单一提交
                         connOrder.commit()
                         rtnData["dataNumber"] += 1
@@ -227,6 +232,10 @@ class InterControl():
                             )
                             curService.execute(lsSql)
                     connService.commit()
+                if rcStore["initFlag"] == 0:
+                    lsSql = r"update store_info set initFlag = 1 where erpID={storeID} and initFlag=0".format(storeID=rcStore["storeID"])
+                    curOrder.execute(lsSql)
+                    connOrder.commit()
             rtnData["result"] = True
         except Exception as e:
             if ibConnOrder:

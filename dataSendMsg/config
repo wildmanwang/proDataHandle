@@ -1,0 +1,16 @@
+[orders]
+host = localhost
+user = root
+password = 0Wangle?
+database = mt_orderinfo
+
+[service]
+host = localhost
+user = root
+password = 0Wangle?
+database = mt_service
+
+[business]
+fromTime = 10:00
+toTime = 16:00
+intervalMinutes = 10

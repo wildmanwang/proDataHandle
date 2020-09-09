@@ -9,7 +9,7 @@
 # OK 自动分析cookie，减少手动配置
 # OK 判断订单状态，根据状态更新订单内容
 
-# 说明：刚部署时，应抓取前一周的订单数据，以便和评价匹配
+# 说明：刚部署时，应抓取前6天（最大）的订单数据，以便和评价匹配
 
 from pyspider.libs.base_handler import *
 import json
@@ -53,7 +53,10 @@ class Handler(BaseHandler):
             "Accept": "application/json, text/plain, */*",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.97 Safari/537.36",
             "X-Requested-With": "XMLHttpRequest",
-            "Referer": "http://e.waimai.meituan.com/v2/order/new/history?region_id=1000440300&region_version={region_version}".format(region_version=self.varDict["region_version"]),
+            "Referer": "http://e.waimai.meituan.com/v2/order/new/history?region_id={region_id}&region_version={region_version}".format(
+                    region_id=self.varDict["region_id"],
+                    region_version=self.varDict["region_version"]
+                ),
             "Accept-Language": "zh-CN,zh;q=0.9",
             "Cookie": self.cookie_order
         }
@@ -131,10 +134,12 @@ class Handler(BaseHandler):
         # 获取订单
         sUrl_order = r"http://e.waimai.meituan.com/v2/order/common/history/all/r/list?" \
             r"lastLabel=&nextLabel=&userId=-1&tag=all&startDate={dateStart}&endDate={dateEnd}" \
-            r"&region_id=1000440300&region_version=1586416007" \
+            r"&region_id={region_id}&region_version={region_version}" \
             "".format(
                 dateStart=self.sDate10StartOrder,
-                dateEnd=self.sDate10EndOrder
+                dateEnd=self.sDate10EndOrder,
+                region_id=self.varDict["region_id"],
+                region_version=self.varDict["region_version"]
             )
         self.crawl(sUrl_order, headers=self.headers_order, age=2*60, retries=0, callback=self.index_page)
 
@@ -151,12 +156,14 @@ class Handler(BaseHandler):
         while iNum > 0:
             sUrl = r"http://e.waimai.meituan.com/v2/order/common/history/all/r/list?lastLabel=&nextLabel=" \
                 r"%7B%22day%22%3A{date8}%2C%22day_seq%22%3A{num}%2C%22page%22%3A0%2C%22setDay_seq%22%3Atrue%2C%22setPage%22%3Afalse%2C%22setDay%22%3Atrue%7D" \
-                r"&userId=-1&tag=all&startDate={dateStart}&endDate={dateEnd}&region_id=1000440300&region_version=1586416007" \
+                r"&userId=-1&tag=all&startDate={dateStart}&endDate={dateEnd}&region_id={region_id}&region_version={region_version}" \
                 "".format(
                     date8=self.sDate8EndOrder,
                     num=iNum+1,
                     dateStart=self.sDate10StartOrder,
-                    dateEnd=self.sDate10EndOrder
+                    dateEnd=self.sDate10EndOrder,
+                    region_id=self.varDict["region_id"],
+                    region_version=self.varDict["region_version"]
                 )
             iNum -= 10
             time.sleep(random.randint(5,15))
@@ -171,7 +178,10 @@ class Handler(BaseHandler):
             return {"info": "获取订单数据失败"}
         sUrl_prepare = ""
         sUrl_delivery = ""
-        sUrl_settle = r"http://e.waimai.meituan.com/v2/order/receive/r/chargeInfo?region_id=1000440300&region_version=1586416007"
+        sUrl_settle = r"http://e.waimai.meituan.com/v2/order/receive/r/chargeInfo?region_id={region_id}&region_version={region_version}".format(
+            region_id=self.varDict["region_id"],
+            region_version=self.varDict["region_version"]
+        )
         listSettle = []
         for each in response.json["data"]["wmOrderList"]:
             cID = int(each["wm_order_id_view_str"])
@@ -217,9 +227,15 @@ class Handler(BaseHandler):
             sUrl_delivery += r"%22%2C%22wmPoiId%22%3A{storeID}%2C%22logisticsStatus%22%3A40%2C%22logisticsCode%22%3A%222002%22%7D".format(storeID=self.varDict["wmPoiId"])
             # 结算
             listSettle.append({"wmOrderViewId": each["wm_order_id_view_str"], "wmPoiId": int(self.varDict["wmPoiId"])})
-        sUrl_prepare += r"%5D&region_id=1000440300&region_version=1586416007"
+        sUrl_prepare += r"%5D&region_id={region_id}&region_version={region_version}".format(
+            region_id=self.varDict["region_id"],
+            region_version=self.varDict["region_version"]
+        )
         self.crawl(sUrl_prepare, headers=self.headers_order, age=0, retries=0, callback=self.detail_page_prepare)
-        sUrl_delivery += r"%5D&region_id=1000440300&region_version=1586416007"
+        sUrl_delivery += r"%5D&region_id={region_id}&region_version={region_version}".format(
+            region_id=self.varDict["region_id"],
+            region_version=self.varDict["region_version"]
+        )
         self.crawl(sUrl_delivery, headers=self.headers_order, age=0, retries=0, callback=self.detail_page_delivery)
         # 注释以下3行代码，暂不需要抓取结算数据
         # sData = json.dumps(listSettle, ensure_ascii = False).replace(' ', '')

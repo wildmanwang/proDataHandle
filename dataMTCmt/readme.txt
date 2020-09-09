@@ -54,15 +54,13 @@ https://blog.csdn.net/weixin_42935779/article/details/104187454
 https://www.cnblogs.com/sunxiuwen/p/9655932.html
 解决mysql客户端安装及版本错误的问题：
 https://blog.csdn.net/lvluobo/article/details/107850673
-微信机器人：
-https://blog.csdn.net/aiyomajun/article/details/105426551
-https://www.zhihu.com/question/387265536
-http://www.woniuxy.com/note/304
-https://blog.csdn.net/weixin_41896770/article/details/102788806
 
 problem:
-    美团服务几点中断？
+    美团服务几点中断？仅一次发现中断，在23:58左右
+    美团几点可以查询前一天的评价数据？
 
-0716-7182592
-
-19986773828
+初期客户列表：
+【牛家人大碗牛肉面（布吉黑金店）】
+    0716-7182592
+    19986773828
+【9294190-饭先生.创意料理】

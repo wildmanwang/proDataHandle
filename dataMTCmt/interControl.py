@@ -75,7 +75,7 @@ class InterControl():
             curService = connService.cursor()
 
             # 评价记录开始时间：今天-3
-            timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 3))
+            timeCmt = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 7))
             timeCmt = int(time.mktime(time.strptime(timeCmt, "%Y-%m-%d")))
 
             # 订单记录开始时间：今天-14
@@ -91,7 +91,7 @@ class InterControl():
             for rcStore in rsStore:
                 # 检索该门店待处理记录
                 lsSql = r"select erpID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration from comment_main " \
-                        r"where comment_time >= {cmt_time} and storeID = {storeID} and orderID is null".format(
+                        r"where comment_time >= {cmt_time} and storeID = {storeID} and orderID is null order by comment_time".format(
                     cmt_time=timeCmt,
                     storeID=rcStore["storeID"]
                 )
@@ -102,7 +102,7 @@ class InterControl():
 
                 # 准备好辅助数据
                 lsSql = r"select erpID, storeID, order_time, estimate_arrival_time, delivery_time from order_main " \
-                        r"where order_time >= {order_time} and storeID = {storeID} and status = 8 and matched = 0".format(
+                        r"where order_time >= {order_time} and storeID = {storeID} and status = 8 and matched = 0 order by order_time".format(
                     order_time=timeOrder,
                     storeID=rcStore["storeID"]
                 )

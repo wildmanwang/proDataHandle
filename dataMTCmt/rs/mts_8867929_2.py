@@ -8,7 +8,7 @@
 # OK 自动分析cookie，减少手动配置
 # OK 判断评价分数，不抓取满分评价
 
-# 说明：刚部署时，应抓取前一周的订单数据，以便和评价匹配
+# 说明：刚部署时，应抓取前6天（最大）的订单数据，以便和评价匹配
 
 from pyspider.libs.base_handler import *
 import json

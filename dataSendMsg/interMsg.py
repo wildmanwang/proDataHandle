@@ -81,7 +81,7 @@ class MsgJYKX():
                         'color': '#173177'
                     },
                     'keyword3': {
-                        'value': '本次找到{num}/{cnt}条差评'.format(num=nCnt, cnt=iCnt),
+                        'value': '昨日{cnt}条差评，找到{num}条对应订单号'.format(cnt=iCnt, num=nCnt) if iCnt > 0 else '昨日0差评',
                         'color': '#173177'
                     },
                     'remark': {

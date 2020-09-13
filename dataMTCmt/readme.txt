@@ -75,4 +75,9 @@ problem:
 【9294190-饭先生.创意料理】
 
 技术问题：
-    报错：'cryptography' package is required for sha256_password or caching_sha2_password auth methods
+报错：'cryptography' package is required for sha256_password or caching_sha2_password auth methods
+    解决：重启电脑，mysql服务器有问题
+    原因：未知
+错误：抓取的数据整页中文乱码，其他页面正常
+    解决：抓取到数据后，增加语句response.content = (response.content).decode('utf-8')
+    原因：pyspider内置的pyquery没有正确的解析目标站的编码，导致的解码失败；这就是 lxml 的蛋疼之处，给它 unicode 它有的时候它不认，给它 bytes 它又处理不好

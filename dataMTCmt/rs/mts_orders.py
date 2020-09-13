@@ -158,6 +158,8 @@ class Handler(BaseHandler):
 
     @config(age=2 * 60)
     def index_page(self, response):
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
         if not response or not response.json["data"] or not response.json["data"]["wmOrderList"]:
             return {"info": "获取订单首页失败"}
         if len(response.json["data"]["wmOrderList"]) > 0:
@@ -188,6 +190,8 @@ class Handler(BaseHandler):
         """
         解析订单数据
         """
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
         if not response or not response.json["data"] or not response.json["data"]["wmOrderList"]:
             return {"info": "获取订单数据失败"}
         sUrl_prepare = ""
@@ -292,6 +296,8 @@ class Handler(BaseHandler):
         """
         解析备餐数据
         """
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
         if not response or not response.json["data"]:
             return {"info": "获取备餐数据失败"}
         for key in response.json["data"]:
@@ -304,6 +310,8 @@ class Handler(BaseHandler):
         """
         解析配送数据
         """
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
         if not response or not response.json["data"]:
             return {"info": "获取配送数据失败"}
         for key in response.json["data"]:
@@ -316,6 +324,8 @@ class Handler(BaseHandler):
         """
         解析结算数据
         """
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
         if not response or not response.json["data"]:
             return {"info": "获取结算数据失败"}
         for each in response.json["data"]:

@@ -170,6 +170,8 @@ class Handler(BaseHandler):
 
     @config(age=2 * 60)
     def index_comment(self, response):
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
         if not response or not response.json["data"] or not response.json["data"]["pageCount"]:
             return {"info": "获取评价首页失败"}
         pageNum = response.json["data"]["pageCount"]
@@ -191,6 +193,8 @@ class Handler(BaseHandler):
         """
         解析评价数据
         """
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
         if not response or not response.json["data"] or not response.json["data"]["comments"]:
             return {"info": "获取评价数据失败"}
         for each in response.json["data"]["comments"]:

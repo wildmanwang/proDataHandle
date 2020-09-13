@@ -101,8 +101,8 @@ class MsgJYKX():
         return rtn
 
     def _prtTime(self, lTime):
-        import datetime
-        return datetime.datetime.utcfromtimestamp(lTime).strftime("%Y-%m-%d %H:%M:%S")
+        import time
+        return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(lTime))
 
 if __name__ == "__main__":
     msg = MsgJYKX()

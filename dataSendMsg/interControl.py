@@ -106,7 +106,7 @@ class InterControl():
                             lastSend=sDate,
                             storeID=rcStore["storeID"]
                         )
-                    curOrder.execute(lsSql)
+                        curOrder.execute(lsSql)
                 connOrder.commit()
                 connService.commit()
             rtnData["result"] = True

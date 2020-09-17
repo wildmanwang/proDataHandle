@@ -25,6 +25,7 @@ class InterControl():
         OK时间范围匹配：评价起止时间范围
         OK单据商品匹配：数量和名称精确匹配
         OK踩赞商品匹配：商品名称模糊匹配
+        用户信息匹配：根据用户ID和用户名匹配
         OK配送时长匹配：按分/秒计算；舍尾/舍入/进位
         OK超时时长匹配：按分/秒计算；舍尾/舍入/进位
         【模糊匹配】
@@ -94,23 +95,24 @@ class InterControl():
                 timeOrder = int(time.mktime(time.strptime(timeOrder, "%Y-%m-%d")))
 
                 # 检索该门店待处理记录
-                lsSql = r"select erpID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration from comment_main " \
+                lsSql = r"select erpID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration, consumerSName from comment_main " \
                         r"where comment_time >= {cmt_time} and storeID = {storeID} and orderID is null order by comment_time".format(
                     cmt_time=timeCmt,
                     storeID=rcStore["storeID"]
                 )
-                ldCol = ["commentID", "comment_str", "order_score", "comment_time", "from_time", "to_time", "ship_duration", "over_duration"]
+                ldCol = ["commentID", "comment_str", "order_score", "comment_time", "from_time", "to_time", "ship_duration", "over_duration", "consumerSName"]
                 curOrder.execute(lsSql)
                 rsTmp = curOrder.fetchall()
                 rsCmtMain = [dict(zip(ldCol, line)) for line in rsTmp]
 
                 # 准备好辅助数据
-                lsSql = r"select erpID, num, order_time, estimate_arrival_time, delivery_time from order_main " \
-                        r"where order_time >= {order_time} and storeID = {storeID} and status = 8 and matched = 0 order by order_time".format(
+                lsSql = r"select order_main.erpID, order_main.num, order_main.order_time, order_main.estimate_arrival_time, order_main.delivery_time, order_main.consumerID, ifnull(consumer_info.consumerSName, '') " \
+                        r"from order_main left join consumer_info on order_main.consumerID = consumer_info.consumerID " \
+                        r"where order_main.order_time >= {order_time} and order_main.storeID = {storeID} and order_main.status = 8 and order_main.matched = 0 order by order_main.order_time".format(
                     order_time=timeOrder,
                     storeID=rcStore["storeID"]
                 )
-                ldCol = ["orderID", "num", "order_time", "estimate_arrival_time", "delivery_time"]
+                ldCol = ["orderID", "num", "order_time", "estimate_arrival_time", "delivery_time", "consumerID", "consumerSName"]
                 curOrder.execute(lsSql)
                 rsTmp = curOrder.fetchall()
                 rsOrderMain = [dict(zip(ldCol, line)) for line in rsTmp]
@@ -137,51 +139,61 @@ class InterControl():
 
                 for rcCmt in rsCmtMain:
                     lOrder = [i for i in rsOrderMain]
-                    iFlag = 0
+                    iFlagSure = 0
                     sInfo = ""
 
+                    # 调试代码
+                    if rcCmt["commentID"] == 3681635396:
+                        iDebug = 0
+
                     # 时间范围匹配：评价起止时间范围
-                    lOrder, iFlag, sInfo = self.stepABillTime(rcCmt, lOrder)
+                    lOrder, iFlagSure, sInfo = self.stepABillTime(rcCmt, lOrder)
                     if len(lOrder) == 0:
                         continue
 
                     # 单据商品匹配：数量和名称精确匹配
-                    lOrder, iFlag, sInfo = self.stepBBillItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
+                    lOrder, iFlagSure, sInfo = self.stepBBillItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
                     if len(lOrder) == 0:
                         continue
 
                     # 踩赞商品匹配：商品名称模糊匹配
-                    lOrder, iFlag, sInfo = self.stepCCommentItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
+                    lOrder, iFlagSure, sInfo = self.stepCCommentItem(rcCmt, lOrder, rsCmtDetail, rsOrderDetail)
                     if len(lOrder) == 0:
                         continue
 
+                    # 用户信息匹配
+                    if len(lOrder) > 1:
+                        lOrder, iFlagSure, sInfo = self.stepDConsumerInfo(rcCmt, lOrder)
+                        if len(lOrder) == 0:
+                            continue
+
                     # 配送时长匹配：按分/秒计算；舍尾/舍入/进位
                     if len(lOrder) > 1:
-                        lOrder, iFlag, sInfo = self.stepDShipTime(rcCmt, lOrder)
+                        lOrder, iFlagSure, sInfo = self.stepEShipTime(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
                     # 超时时长匹配：按分/秒计算；舍尾/舍入/进位
                     if len(lOrder) > 1:
-                        lOrder, iFlag, sInfo = self.stepEOverTime(rcCmt, lOrder)
+                        lOrder, iFlagSure, sInfo = self.stepFOverTime(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
                     # 单个记录匹配：多种方案
                     if len(lOrder) > 1:
-                        lOrder, iFlag, sInfo = self.stepXMatchOne(rcCmt, lOrder)
+                        lOrder, iFlagSure, sInfo = self.stepXMatchOne(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
                     # 权重经验匹配：给不同的情况设置不同的权重
                     if len(lOrder) > 1:
-                        lOrder, iFlag, sInfo = self.stepYByWeight(rcCmt, lOrder)
+                        lOrder, iFlagSure, sInfo = self.stepYByWeight(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
                     # 终极排序匹配：按指定规则获取一个结果
                     if len(lOrder) > 1:
-                        lOrder, iFlag, sInfo = self.stepZFinal(rcCmt, lOrder)
+                        lOrder, iFlagSure, sInfo = self.stepZFinal(rcCmt, lOrder)
                         if len(lOrder) == 0:
                             continue
 
@@ -196,11 +208,28 @@ class InterControl():
                             commentID=rcCmt["commentID"]
                         )
                         curOrder.execute(lsSql)
-                        # 更新订单匹配标志
-                        if iFlag == 1:
+                        if iFlagSure == 1:
+                            # 更新订单匹配标志
                             lsSql = r"update order_main set matched=1 where erpID={orderID}".format(
                                 orderID=lOrder[0]["orderID"]
                             )
+                            curOrder.execute(lsSql)
+                            # 更新顾客信息库
+                            lsSql = r"select count(*) from consumer_info where consumerID={consumerID}".format(
+                                consumerID=lOrder[0]["consumerID"]
+                            )
+                            curOrder.execute(lsSql)
+                            rsTmp = curOrder.fetchall()
+                            if rsTmp[0][0] > 0:
+                                lsSql = r"update consumer_info set consumerSName='{consumerSName}' where consumerID={consumerID}".format(
+                                    consumerSName=rcCmt["consumerSName"],
+                                    consumerID=lOrder[0]["consumerID"]
+                                )
+                            else:
+                                lsSql = r"insert into consumer_info ( consumerID, consumerSName ) values ({consumerID}, '{consumerSName}' )".format(
+                                    consumerSName=rcCmt["consumerSName"],
+                                    consumerID=lOrder[0]["consumerID"]
+                                )
                             curOrder.execute(lsSql)
                         # 把已匹配的订单从备选订单中删除
                         rsOrderMain.remove(lOrder[0])
@@ -216,7 +245,7 @@ class InterControl():
                             orderID=lOrder[0]["orderID"],
                             order_time=lOrder[0]["order_time"],
                             delivery_time=lOrder[0]["delivery_time"],
-                            sure_flag=iFlag,
+                            sure_flag=iFlagSure,
                             remark=sInfo
                         )
                         curService.execute(lsSql)
@@ -333,7 +362,18 @@ class InterControl():
                     lOrder.remove(rcTmp)
         return lOrder, 1, "C：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
-    def stepDShipTime(self, rcCmt, lOrder):
+    def stepDConsumerInfo(self, rcCmt, lOrder):
+        """
+        用户信息匹配
+        :param rcCmt: 评价主记录
+        :param lOrder: 匹配前订单列表
+        :return:
+        """
+        iCnt = len(lOrder)
+        lOrder = [i for i in lOrder if (len(i["consumerSName"]) == 0 or i["consumerSName"] == rcCmt["consumerSName"])]
+        return lOrder, 1, "D：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+
+    def stepEShipTime(self, rcCmt, lOrder):
         """
         配送时长匹配：按分/秒计算；舍尾/舍入/进位
         配送分钟-4 < 配送时长四舍五入分钟取整 < 配送分钟
@@ -348,9 +388,9 @@ class InterControl():
             # 订单配送时间相对评价配送时间范围：向下5分钟，向上1分钟
             if iShip <= rcCmt["ship_duration"] - 5 or iShip > rcCmt["ship_duration"] + 1:
                 lOrder.remove(rcTmp)
-        return lOrder, 1, "D：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 1, "E：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
-    def stepEOverTime(self, rcCmt, lOrder):
+    def stepFOverTime(self, rcCmt, lOrder):
         """
         超时时长匹配：按分/秒计算；舍尾/舍入/进位
         送达时间进位分钟取整-预计送达时间进位分钟取整=超时分钟
@@ -369,7 +409,7 @@ class InterControl():
             for rcTmp in lOrder[::-1]:
                 if rcTmp["estimate_arrival_time"] < rcTmp["delivery_time"]:
                     lOrder.remove(rcTmp)
-        return lOrder, 1, "E：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 1, "F：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepXMatchOne(self, rcCmt, lOrder):
         """

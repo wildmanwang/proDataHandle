@@ -3,6 +3,8 @@
 # Created on 2020-09-10 18:32:18
 # Project: mts_comments
 
+# 说明：刚部署时，应抓取前6天（最大）的评价数据，以便和评价匹配
+
 from pyspider.libs.base_handler import *
 import json
 import datetime, time
@@ -21,7 +23,7 @@ class Handler(BaseHandler):
             "host": "localhost",
             "user": "root",
             "password": "0Wangle?",
-            "dbname": "mt_orderinfo"
+            "dbname": "mt_datatest"
         }
 
     def source_replace(self, source, key, value):
@@ -198,13 +200,14 @@ class Handler(BaseHandler):
         for each in response.json["data"]["comments"]:
             cID = each["id"]
             sSqlJ = r"select 1 from comment_main where erpID = {commentID}".format(commentID=cID)
-            sSqlH = r"insert into comment_main ( erpID, storeID, userName, order_score, food_score, delivery_score, package_score, taste_score, " \
-                r"ship_score, quality_score, comment_time, data_time, to_time, ship_duration, over_duration, consumerSName, comment_str ) " \
-                r"value ( {commentID}, {storeID}, '{userName}', {order_score}, {food_score}, {delivery_score}, {package_score}, {taste_score}, " \
-                r"{ship_score}, {quality_score}, {comment_time}, {data_time}, {to_time}, {ship_duration}, {over_duration}, '{consumerSName}', '{comment_str}' )".format(
+            sSqlH = r"insert into comment_main ( erpID, storeID, userName, comment_str, order_score, food_score, delivery_score, package_score, taste_score, " \
+                r"ship_score, quality_score, comment_time, data_time, to_time, ship_duration, over_duration ) " \
+                r"value ( {commentID}, {storeID}, '{userName}', '{comment_str}', {order_score}, {food_score}, {delivery_score}, {package_score}, {taste_score}, " \
+                r"{ship_score}, {quality_score}, {comment_time}, {data_time}, {to_time}, {ship_duration}, {over_duration} )".format(
                     commentID=cID,
                     storeID=each["wm_poi_id"],
                     userName=each["username"],
+                    comment_str=str(each["comment"]),
                     order_score=each["order_comment_score"],
                     food_score=each["food_comment_score"],
                     delivery_score=each["delivery_comment_score"],
@@ -216,9 +219,7 @@ class Handler(BaseHandler):
                     data_time=int(time.time()),
                     to_time=each["ctime"],
                     ship_duration=each["ship_time"],
-                    over_duration=each["overDeliveryTime"],
-                    consumerSName=each["username"],
-                    comment_str=str(each["comment"])
+                    over_duration=each["overDeliveryTime"]
                 )
             self.data_handle(sSqlJ, False, sSqlH)
             # 商品明细

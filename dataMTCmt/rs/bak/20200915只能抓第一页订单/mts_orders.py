@@ -3,6 +3,8 @@
 # Created on 2020-09-10 18:22:18
 # Project: mts_orders
 
+# 说明：刚部署时，应抓取前6天（最大）的订单数据，以便和评价匹配
+
 from pyspider.libs.base_handler import *
 import json
 import datetime, time
@@ -24,7 +26,7 @@ class Handler(BaseHandler):
             "host": "localhost",
             "user": "root",
             "password": "0Wangle?",
-            "dbname": "mt_orderinfo"
+            "dbname": "mt_datatest"
         }
 
     def source_replace(self, source, key, value):
@@ -107,13 +109,6 @@ class Handler(BaseHandler):
             rsStore = self.data_select(lsSql, ldCol)
             for rcStore in rsStore:
                 storeVar = {}
-                if rcStore["initFlag"] == 1:
-                    iFromDays = 1
-                else:
-                    iFromDays = 6
-                storeVar["sDate10StartOrder"] = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=iFromDays),"%Y-%m-%d")
-                storeVar["sDate10EndOrder"] = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=1),"%Y-%m-%d")
-                storeVar["sDate8EndOrder"] = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=1),"%Y%m%d")
                 
                 strParse = []
                 storeVar["cookie_order"] = rcStore["cookie_order"]
@@ -137,19 +132,29 @@ class Handler(BaseHandler):
                 storeVar["headers_settle"] = storeVar["headers_order"].copy()
                 storeVar["headers_settle"]["Content-Type"] = "application/x-www-form-urlencoded"
                 storeVar["headers_settle"]["Origin"] = "http://e.waimai.meituan.com"
+                
+                if rcStore["initFlag"] == 1:
+                    iFromDays = 1
+                else:
+                    iFromDays = 6
+                for iDay in range(iFromDays, 0, -1):
+                    storeVar["sDate10StartOrder"] = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=iDay),"%Y-%m-%d")
+                    storeVar["sDate10EndOrder"] = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=iDay),"%Y-%m-%d")
+                    storeVar["sDate8EndOrder"] = datetime.datetime.strftime(datetime.date.today() - datetime.timedelta(days=iDay),"%Y%m%d")
 
-                # 获取订单
-                sUrl_order = r"http://e.waimai.meituan.com/v2/order/common/history/all/r/list?" \
-                    r"lastLabel=&nextLabel=&userId=-1&tag=all&startDate={dateStart}&endDate={dateEnd}" \
-                    r"&region_id={region_id}&region_version={region_version}" \
-                    "".format(
-                        dateStart=storeVar["sDate10StartOrder"],
-                        dateEnd=storeVar["sDate10EndOrder"],
-                        region_id=storeVar["varDict"]["region_id"],
-                        region_version=storeVar["varDict"]["region_version"]
-                    )
-                sItag = str(rcStore["storeID"]) + storeVar["sDate8EndOrder"] + "9999"
-                self.crawl(sUrl_order + "#" + sItag, headers=storeVar["headers_order"], itag=sItag, age=2*60, retries=2, callback=self.index_page, save=storeVar)
+                    # 获取订单
+                    sUrl_order = r"http://e.waimai.meituan.com/v2/order/common/history/all/r/list?" \
+                        r"lastLabel=&nextLabel=&userId=-1&tag=all&startDate={dateStart}&endDate={dateEnd}" \
+                        r"&region_id={region_id}&region_version={region_version}" \
+                        "".format(
+                            dateStart=storeVar["sDate10StartOrder"],
+                            dateEnd=storeVar["sDate10EndOrder"],
+                            region_id=storeVar["varDict"]["region_id"],
+                            region_version=storeVar["varDict"]["region_version"]
+                        )
+                    sItag = str(rcStore["storeID"]) + "1" + datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d%H%M%S%f")
+                    self.crawl(sUrl_order + "#" + sItag, headers=storeVar["headers_order"], itag=sItag, age=2*60, retries=2, callback=self.index_page, save=storeVar)
+                    time.sleep(random.randint(5,15))
                 time.sleep(random.randint(5,15))
         except Exception as e:
             print(str(e))
@@ -159,29 +164,29 @@ class Handler(BaseHandler):
         if type(response.content).__name__ == "bytes":
             response.content = (response.content).decode('utf-8')
         if not response or not response.json["data"] or not response.json["data"]["wmOrderList"]:
-            return {"info": "获取订单页失败"}
-        self.detail_page_order(response)
-        iLen = len(response.json["data"]["wmOrderList"])
-        if iLen >= 10:
-            iNum = response.json["data"]["wmOrderList"][9]["num"]
-            if iNum == 11:
-                iNum = 12
-            sDateSpc8 = time.strftime("%Y%m%d", time.localtime(response.json["data"]["wmOrderList"][iLen - 1]["order_time"]))
-            if iNum > 1:
-                sUrl = r"http://e.waimai.meituan.com/v2/order/common/history/all/r/list?lastLabel=&nextLabel=" \
-                    r"%7B%22day%22%3A{date8}%2C%22day_seq%22%3A{num}%2C%22page%22%3A0%2C%22setDay_seq%22%3Atrue%2C%22setPage%22%3Afalse%2C%22setDay%22%3Atrue%7D" \
-                    r"&userId=-1&tag=all&startDate={dateStart}&endDate={dateEnd}&region_id={region_id}&region_version={region_version}" \
-                    "".format(
-                        date8=sDateSpc8,
-                        num=iNum,
-                        dateStart=response.save["sDate10StartOrder"],
-                        dateEnd=response.save["sDate10EndOrder"],
-                        region_id=response.save["varDict"]["region_id"],
-                        region_version=response.save["varDict"]["region_version"]
-                    )
-                sItag = str(response.save["varDict"]["wmPoiId"]) + sDateSpc8 + str(iNum)
-                time.sleep(random.randint(5,15))
-                self.crawl(sUrl + "#" + sItag, headers=response.save["headers_order"], itag=sItag, age=2*60, retries=2, callback=self.index_page, save=response.save)
+            return {"info": "获取订单首页失败"}
+        if len(response.json["data"]["wmOrderList"]) > 0:
+            iNum = response.json["data"]["wmOrderList"][0]["num"]
+            self.detail_page_order(response)
+            iNum -= 10
+        else:
+            iNum = 0
+        while iNum > 0:
+            sUrl = r"http://e.waimai.meituan.com/v2/order/common/history/all/r/list?lastLabel=&nextLabel=" \
+                r"%7B%22day%22%3A{date8}%2C%22day_seq%22%3A{num}%2C%22page%22%3A0%2C%22setDay_seq%22%3Atrue%2C%22setPage%22%3Afalse%2C%22setDay%22%3Atrue%7D" \
+                r"&userId=-1&tag=all&startDate={dateStart}&endDate={dateEnd}&region_id={region_id}&region_version={region_version}" \
+                "".format(
+                    date8=response.save["sDate8EndOrder"],
+                    num=iNum+1,
+                    dateStart=response.save["sDate10StartOrder"],
+                    dateEnd=response.save["sDate10EndOrder"],
+                    region_id=response.save["varDict"]["region_id"],
+                    region_version=response.save["varDict"]["region_version"]
+                )
+            sItag = str(response.save["varDict"]["wmPoiId"]) + str(iNum) + datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d%H%M%S%f")
+            iNum -= 10
+            time.sleep(random.randint(5,15))
+            self.crawl(sUrl + "#" + sItag, headers=response.save["headers_order"], itag=sItag, age=2*60, retries=2, callback=self.detail_page_order, save=response.save)
 
     @config(priority=2)
     def detail_page_order(self, response):
@@ -206,8 +211,8 @@ class Handler(BaseHandler):
             sSqlH = r"delete from order_main where erpID = {orderID}".format(orderID=cID)
             self.data_handle(sSqlJ, True, sSqlH)
             sSqlJ = r"select 1 from order_main where erpID = {orderID}".format(orderID=cID)
-            sSqlH = r"insert into order_main ( erpID, storeID, num, status, order_time, estimate_arrival_time, consumerID, remark ) " \
-                r"values ( {orderID}, {storeID}, {num}, {status}, {order_time}, {estimate_arrival_time}, {consumerID}, '{remark}' )" \
+            sSqlH = r"insert into order_main ( erpID, storeID, num, status, order_time, estimate_arrival_time, consumerID ) " \
+                r"values ( {orderID}, {storeID}, {num}, {status}, {order_time}, {estimate_arrival_time}, {consumerID} )" \
                 "".format(
                     orderID=cID,
                     storeID=each["wm_poi_id"],
@@ -215,8 +220,7 @@ class Handler(BaseHandler):
                     status=iStatus,
                     order_time=each["order_time"],
                     estimate_arrival_time=int(time.mktime(time.strptime(each["estimate_arrival_time_fmt"], "%Y-%m-%d %H:%M:%S"))),
-                    consumerID=each["user_id"],
-                    remark=each["remark"]
+                    consumerID=each["user_id"]
                 )
             self.data_handle(sSqlJ, False, sSqlH)
             # 订单明细

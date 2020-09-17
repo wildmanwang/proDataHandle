@@ -19,7 +19,7 @@ class MsgJYKX():
             rtn["errInfo"] = str(e)
         return rtn
 
-    def send_msg(self, person, sStore, msgs, iCnt):
+    def send_msg(self, person, sStore, msgs, iCnt, msgFlag):
         """
         发消息
             person:     人员ID
@@ -81,7 +81,7 @@ class MsgJYKX():
                         'color': '#173177'
                     },
                     'keyword3': {
-                        'value': '昨日{cnt}条差评，找到{num}条对应订单号'.format(cnt=iCnt, num=nCnt) if iCnt > 0 else '昨日0差评',
+                        'value': '昨日{cnt}条{msgFlag}，找到{num}条对应订单号'.format(cnt=iCnt, msgFlag=msgFlag, num=nCnt) if iCnt > 0 else '昨日0{msgFlag}'.format(msgFlag=msgFlag),
                         'color': '#173177'
                     },
                     'remark': {

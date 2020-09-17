@@ -50,17 +50,24 @@ class InterControl():
 
             # 逐个处理每个门店
             if storeID > 0:
-                lsSql = r"select erpID, name, recipient, IFNULL(lastSend, '') from store_info where erpID={storeID} and recipient>0".format(storeID=storeID)
+                lsSql = r"select erpID, name, recipient, IFNULL(lastSend, ''), msgScore from store_info where erpID={storeID} and recipient>0".format(storeID=storeID)
             else:
-                lsSql = r"select erpID, name, recipient, IFNULL(lastSend, '') from store_info where status=1 and recipient>0 order by level desc"
-            ldCol = ["storeID", "name", "recipient", "lastSend"]
+                lsSql = r"select erpID, name, recipient, IFNULL(lastSend, ''), msgScore from store_info where status=1 and recipient>0 order by level desc"
+            ldCol = ["storeID", "name", "recipient", "lastSend", "msgScore"]
             curOrder.execute(lsSql)
             rsTmp = curOrder.fetchall()
             rsStore = [dict(zip(ldCol, line)) for line in rsTmp]
             for rcStore in rsStore:
                 msgs = []
-                # 统计全部差评数量
-                lsSql = r"select count(erpID), sum(if(order_score < 3, 1, 0)) from comment_main where storeID = {storeID} and comment_time >= {cmt_time}".format(
+                if rcStore["msgScore"] <= 2:
+                    msgFlag = "差评"
+                elif rcStore["msgScore"] <= 3:
+                    msgFlag = "中差评"
+                else:
+                    msgFlag = "评价"
+                # 统计全部需通知评价数量
+                lsSql = r"select count(erpID), sum(if(order_score <= {msgScore}, 1, 0)) from comment_main where storeID = {storeID} and comment_time >= {cmt_time}".format(
+                    msgScore=rcStore["msgScore"],
                     cmt_time=timeCmt,
                     storeID=rcStore["storeID"]
                 )
@@ -70,7 +77,8 @@ class InterControl():
                 iCntBad = rsTmp[0][1]
                 # 检索该门店待处理记录
                 lsSql = r"select commentID, comment_time, order_score, commentStr, order_time, orderNum, orderID, delivery_time, sure_flag from business_notice " \
-                        r"where comment_time >= {cmt_time} and storeID = {storeID} and order_score < 3 and status = 0".format(
+                        r"where comment_time >= {cmt_time} and storeID = {storeID} and order_score <= {msgScore} and status = 0".format(
+                    msgScore=rcStore["msgScore"],
                     cmt_time=timeCmt,
                     storeID=rcStore["storeID"]
                 )
@@ -98,7 +106,7 @@ class InterControl():
                 # 发送消息
                 if len(rsMsg) > 0 or len(rsMsg) == 0 and iCntAll > 0 and sDate > rcStore["lastSend"]:
                     for reci in rcStore["recipient"].split(";"):
-                        self.msgSrv.send_msg(reci, rcStore["name"], msgs, iCntBad)
+                        self.msgSrv.send_msg(reci, rcStore["name"], msgs, iCntBad, msgFlag)
                         print("send:")
                         print(msgs)
                     if sDate > rcStore["lastSend"]:

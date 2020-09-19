@@ -25,9 +25,9 @@ class InterControl():
         """
         rtnData = {
             "result": False,  # 逻辑控制 True/False
+            "info": "",  # 信息
             "dataString": "",  # 字符串
             "dataNumber": 0,  # 数字
-            "info": "",  # 信息
             "entities": {}
         }
 
@@ -90,7 +90,8 @@ class InterControl():
                 msgs = []
                 for msg in rsMsg:
                     if msg["commentID"] != msgPack["commentID"]:
-                        msgs.append(msgPack)
+                        if msgPack["commentID"] > 0:
+                            msgs.append(msgPack)
                         msgPack = {
                             "commentID": msg["commentID"],
                             "comment_time": msg["comment_time"],
@@ -112,13 +113,16 @@ class InterControl():
                 # 发送消息
                 if len(rsMsg) > 0 or len(rsMsg) == 0 and iCntAll > 0 and sDate > rcStore["lastSend"]:
                     for reci in rcStore["recipient"].split(";"):
-                        self.msgSrv.send_msg(reci, rcStore["name"], msgs, iCntBad, msgFlag)
+                        rtnData = self.msgSrv.send_msg(reci, rcStore["name"], msgs, iCntBad, msgFlag)
+                        if not rtnData["result"]:
+                            raise Exception(rtnData["info"])
                         for msgItem in msgs:
                             # 更新标志
                             lsSql = r"update business_notice set status = 1 where commentID = {commentID}".format(
                                 commentID=msgItem["commentID"]
                             )
                             curService.execute(lsSql)
+                        connService.commit()
                         print("send:")
                         print(msgs)
                     if sDate > rcStore["lastSend"]:
@@ -127,8 +131,7 @@ class InterControl():
                             storeID=rcStore["storeID"]
                         )
                         curOrder.execute(lsSql)
-                connOrder.commit()
-                connService.commit()
+                        connOrder.commit()
             rtnData["result"] = True
         except Exception as e:
             if ibConnOrder:

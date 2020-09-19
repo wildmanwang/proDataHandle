@@ -45,16 +45,23 @@ class MsgJYKX():
         import urllib.parse
         import time
         import json
-        rtn = {}
+        rtnData = {
+            "result": False,  # 逻辑控制 True/False
+            "info": "",  # 信息
+            "dataString": "",  # 字符串
+            "dataNumber": 0,  # 数字
+            "entities": {}
+        }
         url = r"http://jy.erpit.cn/api/message/send-user"
         try:
-            nCnt = len(msgs)
+            nCntAll = len(msgs)            # 需要处理的评价数
+            nCntOK = 0                      # 精确定位的评价数
             # 组合文字
             sCmt = "门店名称：{storeName}".format(storeName=sStore)
             iNum = 0
             for line in msgs:
                 iNum += 1
-                sCmt += "\r\n{num}/{cnt}".format(num=iNum, cnt=nCnt).ljust(20, "—")
+                sCmt += "\r\n【{msgFlag}{num}/{cnt}】".format(msgFlag=msgFlag, num=iNum, cnt=nCntAll).ljust(20, "—")
                 sCmt += "\r\n评价时间：{comment_time}".format(comment_time=self._prtTime(line["comment_time"]))
                 sCmt += "\r\n评分总分：{order_score}".format(order_score=line["order_score"])
                 sCmt += "\r\n评价内容：{commentStr}".format(commentStr=line["commentStr"])
@@ -68,21 +75,22 @@ class MsgJYKX():
                     sCmt += "\r\n订单序号：{orderNum}".format(orderNum=line["orderList"][0]["orderNum"])
                     sCmt += "\r\n订单编号：{orderID}".format(orderID=line["orderList"][0]["orderID"])
                     sCmt += "\r\n回访截止：{callbackTime}".format(callbackTime=self._prtTime(line["orderList"][0]["callbackTime"]))
+                    nCntOK += 1
                 else:
                     if line["pic_cnt"] > 0:
-                        sCmt += "\r\n匹配到{num}条订单，也许您从评价的图片能看出点什么:".format(num=line["pic_cnt"])
+                        sCmt += "\r\n匹配到{num}条订单，也许您从评价的图片能看出点什么:".format(num=len(line["orderList"]))
                     else:
-                        sCmt += "\r\n匹配到{num}条订单:".format(num=line["pic_cnt"])
+                        sCmt += "\r\n匹配到{num}条订单，没法再精确了：".format(num=len(line["orderList"]))
                     iOrderNo = 0
                     for orderItem in line["orderList"]:
                         iOrderNo += 1
-                        sCmt += "\r\n{num}.{no}".format(num=iNum, no=iOrderNo).ljust(20, "—")
+                        sCmt += "\r\n{num}.{no}".format(num=iNum, no=iOrderNo)
                         sCmt += "\r\n下单时间：{order_time}".format(order_time=self._prtTime(orderItem["order_time"]))
                         sCmt += "\r\n订单序号：{orderNum}".format(orderNum=orderItem["orderNum"])
                         sCmt += "\r\n订单编号：{orderID}".format(orderID=orderItem["orderID"])
                         sCmt += "\r\n回访截止：{callbackTime}".format(callbackTime=self._prtTime(orderItem["callbackTime"]))
                         if orderItem["order_remark"]:
-                            sCmt += "\r\n订单备注：{order_remark}".format(order_remark=self._prtTime(orderItem["order_remark"]))
+                            sCmt += "\r\n订单备注：{order_remark}".format(order_remark=orderItem["order_remark"])
             data_dict = {
                 "secret": self._secretStr,
                 "uid": person,
@@ -102,7 +110,7 @@ class MsgJYKX():
                         'color': '#173177'
                     },
                     'keyword3': {
-                        'value': '昨日{cnt}条{msgFlag}，找到{num}条对应订单号'.format(cnt=iCnt, msgFlag=msgFlag, num=nCnt) if iCnt > 0 else '昨日0{msgFlag}'.format(msgFlag=msgFlag),
+                        'value': '昨日{cnt}条{msgFlag}，精确匹配{num}条{msgFlag}'.format(cnt=iCnt, msgFlag=msgFlag, num=nCntOK) if iCnt > 0 else '昨日0{msgFlag}'.format(msgFlag=msgFlag),
                         'color': '#173177'
                     },
                     'remark': {
@@ -116,10 +124,14 @@ class MsgJYKX():
             dData = bytes(dData, "utf8")
             request = urllib.request.Request(url, headers=headers, data=dData)
             response = urllib.request.urlopen(request)
-            rtn = response.read().decode("unicode_escape")
+            opRtn = response.read().decode("unicode_escape")
+            opRtn = json.loads(opRtn)
+            if opRtn["code"] == 200:
+                rtnData["result"] = True
+            rtnData["info"] = opRtn["msg"]
         except Exception as e:
-            rtn["errInfo"] = str(e)
-        return rtn
+            rtnData["info"] = str(e)
+        return rtnData
 
     def _prtTime(self, lTime):
         import time

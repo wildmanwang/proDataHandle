@@ -58,7 +58,6 @@ class InterControl():
             rsTmp = curOrder.fetchall()
             rsStore = [dict(zip(ldCol, line)) for line in rsTmp]
             for rcStore in rsStore:
-                msgs = []
                 if rcStore["msgScore"] <= 2:
                     msgFlag = "差评"
                 elif rcStore["msgScore"] <= 3:
@@ -76,37 +75,50 @@ class InterControl():
                 iCntAll = rsTmp[0][0]
                 iCntBad = rsTmp[0][1]
                 # 检索该门店待处理记录
-                lsSql = r"select commentID, comment_time, order_score, commentStr, order_time, orderNum, orderID, delivery_time, sure_flag from business_notice " \
-                        r"where comment_time >= {cmt_time} and storeID = {storeID} and order_score <= {msgScore} and status = 0".format(
+                lsSql = r"select commentID, comment_time, order_score, pic_cnt, commentStr, orderNum, orderID, order_time, delivery_time, order_remark, sure_flag from business_notice " \
+                        r"where comment_time >= {cmt_time} and storeID = {storeID} and order_score <= {msgScore} and status = 0 order by comment_time desc, commentID desc".format(
                     msgScore=rcStore["msgScore"],
                     cmt_time=timeCmt,
                     storeID=rcStore["storeID"]
                 )
-                ldCol = ["commentID", "comment_time", "order_score", "commentStr", "order_time", "orderNum", "orderID", "delivery_time", "sure_flag"]
+                ldCol = ["commentID", "comment_time", "order_score", "pic_cnt", "commentStr", "orderNum", "orderID", "order_time", "delivery_time", "order_remark", "sure_flag"]
                 curService.execute(lsSql)
                 rsTmp = curService.fetchall()
                 rsMsg = [dict(zip(ldCol, line)) for line in rsTmp]
+                msgPack = {}
+                msgPack["commentID"] = 0
+                msgs = []
                 for msg in rsMsg:
-                    # 添加消息内容
-                    msgs.append({
-                        "cmtTime": msg["comment_time"],
-                        "orderScore": msg["order_score"],
-                        "cmtStr": msg["commentStr"],
-                        "orderTime": msg["order_time"],
+                    if msg["commentID"] != msgPack["commentID"]:
+                        msgs.append(msgPack)
+                        msgPack = {
+                            "commentID": msg["commentID"],
+                            "comment_time": msg["comment_time"],
+                            "order_score": msg["order_score"],
+                            "pic_cnt": msg["pic_cnt"],
+                            "commentStr": msg["commentStr"],
+                            "orderList": [],
+                            "sure_flag": msg["sure_flag"]
+                        }
+                    msgPack["orderList"].append({
                         "orderNum": msg["orderNum"],
                         "orderID": msg["orderID"],
+                        "order_time": msg["order_time"],
                         "callbackTime": msg["delivery_time"] + 24 * 60 * 60,
-                        "sureFlag": msg["sure_flag"]
+                        "order_remark": msg["order_remark"]
                     })
-                    # 更新标志
-                    lsSql = r"update business_notice set status = 1 where commentID = {commentID}".format(
-                        commentID=msg["commentID"]
-                    )
-                    curService.execute(lsSql)
+                if msgPack["commentID"] > 0:
+                    msgs.append(msgPack)
                 # 发送消息
                 if len(rsMsg) > 0 or len(rsMsg) == 0 and iCntAll > 0 and sDate > rcStore["lastSend"]:
                     for reci in rcStore["recipient"].split(";"):
                         self.msgSrv.send_msg(reci, rcStore["name"], msgs, iCntBad, msgFlag)
+                        for msgItem in msgs:
+                            # 更新标志
+                            lsSql = r"update business_notice set status = 1 where commentID = {commentID}".format(
+                                commentID=msgItem["commentID"]
+                            )
+                            curService.execute(lsSql)
                         print("send:")
                         print(msgs)
                     if sDate > rcStore["lastSend"]:

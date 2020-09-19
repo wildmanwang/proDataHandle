@@ -55,13 +55,34 @@ class MsgJYKX():
             for line in msgs:
                 iNum += 1
                 sCmt += "\r\n{num}/{cnt}".format(num=iNum, cnt=nCnt).ljust(20, "—")
-                sCmt += "\r\n评价时间：{cmtTime}".format(cmtTime=self._prtTime(line["cmtTime"]))
-                sCmt += "\r\n评分总分：{orderScore}".format(orderScore=line["orderScore"])
-                sCmt += "\r\n评价内容：{cmtStr}".format(cmtStr=line["cmtStr"])
-                sCmt += "\r\n下单时间：{orderTime}".format(orderTime=self._prtTime(line["orderTime"]))
-                sCmt += "\r\n订单序号：{orderNum}".format(orderNum=line["orderNum"])
-                sCmt += "\r\n订单编号：{orderID}".format(orderID=line["orderID"])
-                sCmt += "\r\n回访截止：{callbackTime}".format(callbackTime=self._prtTime(line["callbackTime"]))
+                sCmt += "\r\n评价时间：{comment_time}".format(comment_time=self._prtTime(line["comment_time"]))
+                sCmt += "\r\n评分总分：{order_score}".format(order_score=line["order_score"])
+                sCmt += "\r\n评价内容：{commentStr}".format(commentStr=line["commentStr"])
+                if len(line["orderList"]) == 0:
+                    if line["pic_cnt"] > 0:
+                        sCmt += "\r\n没有匹配到订单，也许您从评价的图片能看出点什么"
+                    else:
+                        sCmt += "\r\n没有匹配到订单，评价信息量实在是太少..."
+                elif len(line["orderList"]) == 1:
+                    sCmt += "\r\n下单时间：{order_time}".format(order_time=self._prtTime(line["orderList"][0]["order_time"]))
+                    sCmt += "\r\n订单序号：{orderNum}".format(orderNum=line["orderList"][0]["orderNum"])
+                    sCmt += "\r\n订单编号：{orderID}".format(orderID=line["orderList"][0]["orderID"])
+                    sCmt += "\r\n回访截止：{callbackTime}".format(callbackTime=self._prtTime(line["orderList"][0]["callbackTime"]))
+                else:
+                    if line["pic_cnt"] > 0:
+                        sCmt += "\r\n匹配到{num}条订单，也许您从评价的图片能看出点什么:".format(num=line["pic_cnt"])
+                    else:
+                        sCmt += "\r\n匹配到{num}条订单:".format(num=line["pic_cnt"])
+                    iOrderNo = 0
+                    for orderItem in line["orderList"]:
+                        iOrderNo += 1
+                        sCmt += "\r\n{num}.{no}".format(num=iNum, no=iOrderNo).ljust(20, "—")
+                        sCmt += "\r\n下单时间：{order_time}".format(order_time=self._prtTime(orderItem["order_time"]))
+                        sCmt += "\r\n订单序号：{orderNum}".format(orderNum=orderItem["orderNum"])
+                        sCmt += "\r\n订单编号：{orderID}".format(orderID=orderItem["orderID"])
+                        sCmt += "\r\n回访截止：{callbackTime}".format(callbackTime=self._prtTime(orderItem["callbackTime"]))
+                        if orderItem["order_remark"]:
+                            sCmt += "\r\n订单备注：{order_remark}".format(order_remark=self._prtTime(orderItem["order_remark"]))
             data_dict = {
                 "secret": self._secretStr,
                 "uid": person,

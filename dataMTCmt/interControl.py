@@ -143,7 +143,7 @@ class InterControl():
                     sInfo = ""
 
                     # 调试代码
-                    if rcCmt["commentID"] == 3681635396:
+                    if rcCmt["commentID"] == 3597179082:
                         iDebug = 0
 
                     # 时间范围匹配：评价起止时间范围
@@ -257,15 +257,15 @@ class InterControl():
                                     r"values ( {storeID}, {commentID}, {orderID}, {comment_time}, {order_score}, {pic_cnt}, '{commentStr}', {orderNum}, {order_time}, {delivery_time}, '{order_remark}', {sure_flag}, '{remark}' )".format(
                                 storeID=rcStore["storeID"],
                                 commentID=rcCmt["commentID"],
-                                orderID=lOrder[0]["orderID"],
+                                orderID=recOrder["orderID"],
                                 comment_time=rcCmt["comment_time"],
                                 order_score=rcCmt["order_score"],
                                 pic_cnt=rcCmt["pic_cnt"],
                                 commentStr=rcCmt["comment_str"],
-                                orderNum=lOrder[0]["num"],
-                                order_time=lOrder[0]["order_time"],
-                                delivery_time=lOrder[0]["delivery_time"],
-                                order_remark=lOrder[0]["remark"],
+                                orderNum=recOrder["num"],
+                                order_time=recOrder["order_time"],
+                                delivery_time=recOrder["delivery_time"],
+                                order_remark=recOrder["remark"],
                                 sure_flag=iFlagSure,
                                 remark=sInfo
                             )

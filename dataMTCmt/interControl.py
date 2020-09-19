@@ -95,12 +95,12 @@ class InterControl():
                 timeOrder = int(time.mktime(time.strptime(timeOrder, "%Y-%m-%d")))
 
                 # 检索该门店待处理记录
-                lsSql = r"select erpID, order_score, comment_time, from_time, to_time, ship_duration, over_duration, consumerSName, comment_str from comment_main " \
+                lsSql = r"select erpID, order_score, pic_cnt, comment_time, from_time, to_time, ship_duration, over_duration, consumerSName, comment_str from comment_main " \
                         r"where comment_time >= {cmt_time} and storeID = {storeID} and orderID is null order by comment_time".format(
                     cmt_time=timeCmt,
                     storeID=rcStore["storeID"]
                 )
-                ldCol = ["commentID", "order_score", "comment_time", "from_time", "to_time", "ship_duration", "over_duration", "consumerSName", "comment_str"]
+                ldCol = ["commentID", "order_score", "pic_cnt", "comment_time", "from_time", "to_time", "ship_duration", "over_duration", "consumerSName", "comment_str"]
                 curOrder.execute(lsSql)
                 rsTmp = curOrder.fetchall()
                 rsCmtMain = [dict(zip(ldCol, line)) for line in rsTmp]
@@ -209,7 +209,8 @@ class InterControl():
                         if len(lOrder) == 0:
                             continue
 
-                    lsSql = r"delete from handle_data where commentID = {commentID}".format(
+                    lsSql = r"delete from business_notice where storeID={storeID} and commentID = {commentID}".format(
+                        storeID=rcStore["storeID"],
                         commentID=rcCmt["commentID"]
                     )
                     curService.execute(lsSql)
@@ -246,33 +247,47 @@ class InterControl():
                                 curOrder.execute(lsSql)
                         # 把已匹配的订单从备选订单中删除
                         rsOrderMain.remove(lOrder[0])
-                        # 差评生成通知消息
-                        lsSql = r"insert into business_notice ( storeID, commentID, comment_time, order_score, commentStr, orderNum, orderID, order_time, delivery_time, sure_flag, status, remark ) " \
-                                r"values ( {storeID}, {commentID}, {comment_time}, {order_score}, '{comment_str}', {orderNum}, {orderID}, {order_time}, {delivery_time}, {sure_flag}, 0, '{remark}' )".format(
+                        # 一单一提交
+                        connOrder.commit()
+                        rtnData["dataNumber"] += 1
+                    if len(lOrder) == 1 or len(lOrder) > 1 and len(lOrder) < 5 and rcCmt["order_score"] <= rcStore["msgScore"]:
+                        # 生成通知消息
+                        for recOrder in lOrder:
+                            lsSql = r"insert into business_notice ( storeID, commentID, orderID, comment_time, order_score, pic_cnt, commentStr, orderNum, order_time, delivery_time, order_remark, sure_flag, remark ) " \
+                                    r"values ( {storeID}, {commentID}, {orderID}, {comment_time}, {order_score}, {pic_cnt}, '{commentStr}', {orderNum}, {order_time}, {delivery_time}, '{order_remark}', {sure_flag}, '{remark}' )".format(
+                                storeID=rcStore["storeID"],
+                                commentID=rcCmt["commentID"],
+                                orderID=lOrder[0]["orderID"],
+                                comment_time=rcCmt["comment_time"],
+                                order_score=rcCmt["order_score"],
+                                pic_cnt=rcCmt["pic_cnt"],
+                                commentStr=rcCmt["comment_str"],
+                                orderNum=lOrder[0]["num"],
+                                order_time=lOrder[0]["order_time"],
+                                delivery_time=lOrder[0]["delivery_time"],
+                                order_remark=lOrder[0]["remark"],
+                                sure_flag=iFlagSure,
+                                remark=sInfo
+                            )
+                            curService.execute(lsSql)
+                    elif len(lOrder) == 0 and rcCmt["order_score"] <= rcStore["msgScore"]:
+                        lsSql = r"insert into business_notice ( storeID, commentID, orderID, comment_time, order_score, pic_cnt, commentStr, orderNum, order_time, delivery_time, order_remark, sure_flag, remark ) " \
+                                r"values ( {storeID}, {commentID}, {orderID}, {comment_time}, {order_score}, {pic_cnt}, '{commentStr}', {orderNum}, {order_time}, {delivery_time}, '{order_remark}', {sure_flag}, '{remark}' )".format(
                             storeID=rcStore["storeID"],
                             commentID=rcCmt["commentID"],
+                            orderID=0,
                             comment_time=rcCmt["comment_time"],
                             order_score=rcCmt["order_score"],
-                            comment_str=rcCmt["comment_str"],
-                            orderNum=lOrder[0]["num"],
-                            orderID=lOrder[0]["orderID"],
-                            order_time=lOrder[0]["order_time"],
-                            delivery_time=lOrder[0]["delivery_time"],
+                            pic_cnt=rcCmt["pic_cnt"],
+                            commentStr=rcCmt["comment_str"],
+                            orderNum=0,
+                            order_time=0,
+                            delivery_time=0,
+                            order_remark=None,
                             sure_flag=iFlagSure,
                             remark=sInfo
                         )
                         curService.execute(lsSql)
-                        # 一单一提交
-                        connOrder.commit()
-                        rtnData["dataNumber"] += 1
-                    elif len(lOrder) > 1 and len(lOrder) < 5 and rcCmt["order_score"] <= rcStore["msgScore"]:
-                        # 确定了范围，待下次重新分析，写入临时表
-                        for recOrder in lOrder:
-                            lsSql = r"insert into handle_data ( commentID, orderID ) values ( {commentID}, {orderID} )".format(
-                                commentID=rcCmt["commentID"],
-                                orderID=recOrder["orderID"]
-                            )
-                            curService.execute(lsSql)
                     connService.commit()
                 if rcStore["initFlag"] == 0:
                     lsSql = r"update store_info set initFlag = 1 where erpID={storeID} and initFlag=0".format(storeID=rcStore["storeID"])
@@ -520,7 +535,7 @@ class InterControl():
         :return:
         """
         iCnt = len(lOrder)
-        return lOrder, 0, "Y：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 4, "Y：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepZFinal(self, rcCmt, lOrder):
         """
@@ -530,7 +545,7 @@ class InterControl():
         :return:
         """
         iCnt = len(lOrder)
-        return lOrder, 0, "Z：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 3, "Z：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def histroyHandle(self):
         """

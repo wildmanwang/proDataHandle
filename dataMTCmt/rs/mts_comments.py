@@ -198,13 +198,12 @@ class Handler(BaseHandler):
         for each in response.json["data"]["comments"]:
             cID = each["id"]
             sSqlJ = r"select 1 from comment_main where erpID = {commentID}".format(commentID=cID)
-            sSqlH = r"insert into comment_main ( erpID, storeID, userName, order_score, food_score, delivery_score, package_score, taste_score, " \
-                r"ship_score, quality_score, comment_time, data_time, to_time, ship_duration, over_duration, consumerSName, comment_str ) " \
-                r"value ( {commentID}, {storeID}, '{userName}', {order_score}, {food_score}, {delivery_score}, {package_score}, {taste_score}, " \
-                r"{ship_score}, {quality_score}, {comment_time}, {data_time}, {to_time}, {ship_duration}, {over_duration}, '{consumerSName}', '{comment_str}' )".format(
+            sSqlH = r"insert into comment_main ( erpID, storeID, order_score, food_score, delivery_score, package_score, taste_score, " \
+                r"ship_score, quality_score, pic_cnt, comment_time, data_time, to_time, ship_duration, over_duration, consumerSName, comment_str ) " \
+                r"value ( {commentID}, {storeID}, {order_score}, {food_score}, {delivery_score}, {package_score}, {taste_score}, " \
+                r"{ship_score}, {quality_score}, {pic_cnt}, {comment_time}, {data_time}, {to_time}, {ship_duration}, {over_duration}, '{consumerSName}', '{comment_str}' )".format(
                     commentID=cID,
                     storeID=each["wm_poi_id"],
-                    userName=each["username"],
                     order_score=each["order_comment_score"],
                     food_score=each["food_comment_score"],
                     delivery_score=each["delivery_comment_score"],
@@ -212,6 +211,7 @@ class Handler(BaseHandler):
                     taste_score=each["taste_score"],
                     ship_score=each["ship_score"],
                     quality_score=each["quality_score"],
+                    pic_cnt=len(each["picture_urls"]),
                     comment_time=each["ctime"],
                     data_time=int(time.time()),
                     to_time=each["ctime"],

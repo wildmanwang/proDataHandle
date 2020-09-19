@@ -76,8 +76,8 @@ class InterControl():
             curService = connService.cursor()
 
             # 逐个处理每个门店
-            lsSql = r"select erpID, name, initFlag from store_info where status = 1 order by level desc"
-            ldCol = ["storeID", "name", "initFlag"]
+            lsSql = r"select erpID, name, initFlag, msgScore from store_info where status = 1 order by level desc"
+            ldCol = ["storeID", "name", "initFlag", "msgScore"]
             curOrder.execute(lsSql)
             rsTmp = curOrder.fetchall()
             rsStore = [dict(zip(ldCol, line)) for line in rsTmp]
@@ -95,24 +95,24 @@ class InterControl():
                 timeOrder = int(time.mktime(time.strptime(timeOrder, "%Y-%m-%d")))
 
                 # 检索该门店待处理记录
-                lsSql = r"select erpID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration, consumerSName from comment_main " \
+                lsSql = r"select erpID, order_score, comment_time, from_time, to_time, ship_duration, over_duration, consumerSName, comment_str from comment_main " \
                         r"where comment_time >= {cmt_time} and storeID = {storeID} and orderID is null order by comment_time".format(
                     cmt_time=timeCmt,
                     storeID=rcStore["storeID"]
                 )
-                ldCol = ["commentID", "comment_str", "order_score", "comment_time", "from_time", "to_time", "ship_duration", "over_duration", "consumerSName"]
+                ldCol = ["commentID", "order_score", "comment_time", "from_time", "to_time", "ship_duration", "over_duration", "consumerSName", "comment_str"]
                 curOrder.execute(lsSql)
                 rsTmp = curOrder.fetchall()
                 rsCmtMain = [dict(zip(ldCol, line)) for line in rsTmp]
 
                 # 准备好辅助数据
-                lsSql = r"select order_main.erpID, order_main.num, order_main.order_time, order_main.estimate_arrival_time, order_main.delivery_time, order_main.consumerID, ifnull(consumer_info.consumerSName, '') " \
+                lsSql = r"select order_main.erpID, order_main.num, order_main.order_time, order_main.estimate_arrival_time, order_main.delivery_time, order_main.consumerID, ifnull(consumer_info.consumerSName, ''), order_main.remark " \
                         r"from order_main left join consumer_info on order_main.consumerID = consumer_info.consumerID " \
                         r"where order_main.order_time >= {order_time} and order_main.storeID = {storeID} and order_main.status = 8 and order_main.matched = 0 order by order_main.order_time".format(
                     order_time=timeOrder,
                     storeID=rcStore["storeID"]
                 )
-                ldCol = ["orderID", "num", "order_time", "estimate_arrival_time", "delivery_time", "consumerID", "consumerSName"]
+                ldCol = ["orderID", "num", "order_time", "estimate_arrival_time", "delivery_time", "consumerID", "consumerSName", "remark"]
                 curOrder.execute(lsSql)
                 rsTmp = curOrder.fetchall()
                 rsOrderMain = [dict(zip(ldCol, line)) for line in rsTmp]
@@ -179,7 +179,19 @@ class InterControl():
                         if len(lOrder) == 0:
                             continue
 
-                    # 单个记录匹配：多种方案
+                    # 用户名称匹配
+                    if len(lOrder) > 1:
+                        lOrder, iFlagSure, sInfo = self.stepGConsumerName(rcCmt, lOrder)
+                        if len(lOrder) == 0:
+                            continue
+
+                    # 评价时机匹配
+                    if len(lOrder) > 1:
+                        lOrder, iFlagSure, sInfo = self.stepHCommentMoment(rcCmt, lOrder)
+                        if len(lOrder) == 0:
+                            continue
+
+                    # 特殊场景匹配：多种方案
                     if len(lOrder) > 1:
                         lOrder, iFlagSure, sInfo = self.stepXMatchOne(rcCmt, lOrder)
                         if len(lOrder) == 0:
@@ -208,29 +220,30 @@ class InterControl():
                             commentID=rcCmt["commentID"]
                         )
                         curOrder.execute(lsSql)
-                        if iFlagSure == 1:
+                        if iFlagSure >= 8:
                             # 更新订单匹配标志
                             lsSql = r"update order_main set matched=1 where erpID={orderID}".format(
                                 orderID=lOrder[0]["orderID"]
                             )
                             curOrder.execute(lsSql)
                             # 更新顾客信息库
-                            lsSql = r"select count(*) from consumer_info where consumerID={consumerID}".format(
-                                consumerID=lOrder[0]["consumerID"]
-                            )
-                            curOrder.execute(lsSql)
-                            rsTmp = curOrder.fetchall()
-                            if rsTmp[0][0] > 0:
-                                lsSql = r"update consumer_info set consumerSName='{consumerSName}' where consumerID={consumerID}".format(
-                                    consumerSName=rcCmt["consumerSName"],
+                            if rcCmt["consumerSName"] != "匿名用户":
+                                lsSql = r"select count(*) from consumer_info where consumerID={consumerID}".format(
                                     consumerID=lOrder[0]["consumerID"]
                                 )
-                            else:
-                                lsSql = r"insert into consumer_info ( consumerID, consumerSName ) values ({consumerID}, '{consumerSName}' )".format(
-                                    consumerSName=rcCmt["consumerSName"],
-                                    consumerID=lOrder[0]["consumerID"]
-                                )
-                            curOrder.execute(lsSql)
+                                curOrder.execute(lsSql)
+                                rsTmp = curOrder.fetchall()
+                                if rsTmp[0][0] > 0:
+                                    lsSql = r"update consumer_info set consumerSName='{consumerSName}' where consumerID={consumerID}".format(
+                                        consumerSName=rcCmt["consumerSName"],
+                                        consumerID=lOrder[0]["consumerID"]
+                                    )
+                                else:
+                                    lsSql = r"insert into consumer_info ( consumerID, consumerSName ) values ({consumerID}, '{consumerSName}' )".format(
+                                        consumerSName=rcCmt["consumerSName"],
+                                        consumerID=lOrder[0]["consumerID"]
+                                    )
+                                curOrder.execute(lsSql)
                         # 把已匹配的订单从备选订单中删除
                         rsOrderMain.remove(lOrder[0])
                         # 差评生成通知消息
@@ -252,7 +265,7 @@ class InterControl():
                         # 一单一提交
                         connOrder.commit()
                         rtnData["dataNumber"] += 1
-                    elif len(lOrder) > 1 and len(lOrder) <= 3 and 1 == 2:
+                    elif len(lOrder) > 1 and len(lOrder) < 5 and rcCmt["order_score"] <= rcStore["msgScore"]:
                         # 确定了范围，待下次重新分析，写入临时表
                         for recOrder in lOrder:
                             lsSql = r"insert into handle_data ( commentID, orderID ) values ( {commentID}, {orderID} )".format(
@@ -305,7 +318,7 @@ class InterControl():
             if not (t1 < tCmt):
                 lOrder.remove(rcTmp)
 
-        return lOrder, 1, "A：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 9, "A：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepBBillItem(self, rcCmt, lOrder, rsCmtDetail, rsOrderDetail):
         """
@@ -333,7 +346,7 @@ class InterControl():
                             break
                 if not bFind:
                     lOrder.remove(rcTmp)
-        return lOrder, 1, "B：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 9, "B：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepCCommentItem(self, rcCmt, lOrder, rsCmtDetail, rsOrderDetail):
         """
@@ -360,7 +373,7 @@ class InterControl():
                         break
                 if not bFind:
                     lOrder.remove(rcTmp)
-        return lOrder, 1, "C：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 9, "C：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepDConsumerInfo(self, rcCmt, lOrder):
         """
@@ -370,8 +383,9 @@ class InterControl():
         :return:
         """
         iCnt = len(lOrder)
-        lOrder = [i for i in lOrder if (len(i["consumerSName"]) == 0 or i["consumerSName"] == rcCmt["consumerSName"])]
-        return lOrder, 1, "D：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        if rcCmt["consumerSName"] and rcCmt["consumerSName"] != "匿名用户":
+            lOrder = [i for i in lOrder if (len(i["consumerSName"]) == 0 or i["consumerSName"] == rcCmt["consumerSName"])]
+        return lOrder, 9, "D：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepEShipTime(self, rcCmt, lOrder):
         """
@@ -388,7 +402,7 @@ class InterControl():
             # 订单配送时间相对评价配送时间范围：向下5分钟，向上1分钟
             if iShip <= rcCmt["ship_duration"] - 5 or iShip > rcCmt["ship_duration"] + 1:
                 lOrder.remove(rcTmp)
-        return lOrder, 1, "E：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 8, "E：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
     def stepFOverTime(self, rcCmt, lOrder):
         """
@@ -409,11 +423,25 @@ class InterControl():
             for rcTmp in lOrder[::-1]:
                 if rcTmp["estimate_arrival_time"] < rcTmp["delivery_time"]:
                     lOrder.remove(rcTmp)
-        return lOrder, 1, "F：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+        return lOrder, 8, "F：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
 
-    def stepXMatchOne(self, rcCmt, lOrder):
+    def stepGConsumerName(self, rcCmt, lOrder):
         """
-        单个记录匹配：多种方案
+        用户名称匹配
+        :param rcCmt: 评价主记录
+        :param lOrder: 匹配前订单列表
+        :return:
+        """
+        iCnt = len(lOrder)
+        if rcCmt["consumerSName"] and rcCmt["consumerSName"] != "匿名用户":
+            lTmp = [i for i in lOrder if (i["consumerSName"] == rcCmt["consumerSName"])]
+            if len(lTmp) > 0:
+                lOrder = lTmp
+        return lOrder, 8, "G：{num1}/{num2}".format(num1=len(lOrder), num2=iCnt)
+
+    def stepHCommentMoment(self, rcCmt, lOrder):
+        """
+        评价时机匹配
         :param rcCmt:
         :param lOrder:
         :return:
@@ -424,50 +452,65 @@ class InterControl():
         tCmt = rcCmt["comment_time"]
         lTmp = []
 
-        # 在评价时间前60分钟内送达，只有一个订单
-        if len(lTmp) == 0:
-            lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 60 * 60)]
-            sInfo += "X-1-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
-            if len(lTmp) == 1:
-                return lTmp, 1, sInfo
-            elif len(lTmp) > 1:
-                # 送达30秒后评价更常见
-                lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] >= 30)]
-                sInfo += "X-1-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
-                if len(lTmp) == 1:
-                    return lTmp, 1, sInfo
-                elif len(lTmp) > 1:
-                    # 30分钟内评价更常见
-                    lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] <= 30 * 60)]
-                    sInfo += "X-1-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
-                    if len(lTmp) == 1:
-                        return lTmp, 1, sInfo
-
         # 送达时间和评价时间都在当天0:00-7:00间，只有一个订单
         if len(lTmp) == 0:
             lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 7 * 60 * 60 and self._getHour(tCmt) >= 0 and self._getHour(tCmt) <= 7 and self._getHour(i["delivery_time"]) >= 0 and self._getHour(i["delivery_time"]) <= 7)]
-            sInfo += "X-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
-            if len(lTmp) == 1:
-                return lTmp, 1, sInfo
+            sInfo += "H1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+            if len(lTmp) > 0:
+                lOrder = lTmp
+
+        # 在评价时间前60分钟内送达，只有一个订单
+        if len(lTmp) == 0:
+            lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] <= 60 * 60)]
+            sInfo += "H2-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+            if len(lTmp) > 0:
+                lOrder = lTmp
+            elif len(lTmp) > 1:
+                # 送达30秒后评价更常见
+                lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] >= 30)]
+                sInfo += "H2-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+                if len(lTmp) > 0:
+                    lOrder = lTmp
+                elif len(lTmp) > 1:
+                    # 30分钟内评价更常见
+                    lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] <= 30 * 60)]
+                    sInfo += "H2-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+                    if len(lTmp) > 0:
+                        lOrder = lTmp
+
+        return lOrder, 6, sInfo
+
+    def stepXMatchOne(self, rcCmt, lOrder):
+        """
+        特殊场景匹配：多种方案
+        :param rcCmt:
+        :param lOrder:
+        :return:
+        """
+        iCnt = len(lOrder)
+        sInfo = ""
+        # 变量定义
+        tCmt = rcCmt["comment_time"]
+        lTmp = []
 
         # 不同日期，日期相差不过7天，送达与评价绝对值相差指定时长内，只有一个订单
         if len(lTmp) == 0:
             lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] > 7 * 60 * 60 and tCmt - i["delivery_time"] < (7 * 24 + 1) * 60 * 60 and abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 90 * 60)]
-            sInfo += "X-3-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+            sInfo += "X1-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
             if len(lTmp) == 1:
-                return lTmp, 0, sInfo
+                lOrder = lTmp
             elif len(lTmp) > 1:
                 lTmp = [i for i in lTmp if (abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 60 * 60)]
-                sInfo += "X-3-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+                sInfo += "X2-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
                 if len(lTmp) == 1:
-                    return lTmp, 0, sInfo
+                    lOrder = lTmp
                 elif len(lTmp) > 1:
                     lTmp = [i for i in lTmp if (abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 30 * 60)]
-                    sInfo += "X-3-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+                    sInfo += "X3-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
                     if len(lTmp) == 1:
-                        return lTmp, 0, sInfo
+                        lOrder = lTmp
 
-        return lOrder, 0, sInfo
+        return lOrder, 4, sInfo
 
     def stepYByWeight(self, rcCmt, lOrder):
         """

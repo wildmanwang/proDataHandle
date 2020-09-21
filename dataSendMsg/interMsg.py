@@ -98,7 +98,7 @@ class MsgJYKX():
                 "url": "",
                 "data": {
                     'first': {
-                        'value': '数据服务',
+                        'value': '云通科技数据服务',
                         'color': '#173177'
                     },
                     'keyword1': {

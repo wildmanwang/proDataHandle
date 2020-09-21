@@ -108,6 +108,7 @@ class Handler(BaseHandler):
             cur.execute(lsSql)
             self.db.commit()
         except Exception as e:
+            print(lsSql)
             print(str(e))
             self.db.rollback()
     
@@ -195,113 +196,102 @@ class Handler(BaseHandler):
 
     @config(age=2 * 60)
     def index_comment(self, response):
-        try:
-            if type(response.content).__name__ == "bytes":
-                response.content = (response.content).decode('utf-8')
-            if response.json["code"] == 0:
-                if not response.json["data"]:
-                    self.operlog(response.save["varDict"]["wmPoiId"], 2, -1, None, None, "获取评价信息失败：无json数据")
-                    return {"info": "获取评价信息失败：无json数据"}
-                pageNum = response.json["data"]["pageNum"]
-                pageCount = response.json["data"]["pageCount"]
-                if pageNum <= pageCount:
-                    # 解析当前页面
-                    self.detail_page_comment(response)
-                if pageNum < pageCount:
-                    # 爬取下个页面
-                    sUrl_comment = r"https://waimaieapp.meituan.com/gw/api/customer/comment/r/list?ignoreSetRouterProxy=true"
-                    pageNum += 1
-                    response.save["data_comment"]["pageNum"] = str(pageNum)
-                    time.sleep(random.randint(5,15))
-                    sItag = str(response.save["varDict"]["wmPoiId"]) + str(pageNum) + datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d%H%M%S%f")
-                    self.crawl(sUrl_comment + "#" + sItag, method="POST", data=response.save["data_comment"], headers=response.save["headers_comment"], itag=sItag, age=0, retries=1, validate_cert=False, callback=self.index_comment)
-            else:
-                # code=1001     登录过期，需要重新登录
-                self.operlog(response.save["varDict"]["wmPoiId"], 2, -1, None, None, "错误[{code}]：{msg}".format(code=response.json["code"], msg=response.json["msg"]))
-                return {"info": "[{storeID}]错误[{code}]：{msg}".format(storeID=response.save["varDict"]["wmPoiId"], code=response.json["code"], msg=response.json["msg"])}
-        except Exception as e:
-            self.operlog(0, 2, -1, None, None, str(e))
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
+        if not response or not response.json["data"] or not response.json["data"]["pageCount"]:
+            return {"info": "获取评价首页失败"}
+        pageNum = response.json["data"]["pageCount"]
+        if pageNum > 0:
+            self.detail_page_comment(response)
+            iNum = 1
+        else:
+            iNum = 0
+        sUrl_comment = r"https://waimaieapp.meituan.com/gw/api/customer/comment/r/list?ignoreSetRouterProxy=true"
+        while iNum < pageNum:
+            iNum += 1
+            response.save["data_comment"]["pageNum"] = str(iNum)
+            time.sleep(random.randint(5,15))
+            sItag = str(response.save["varDict"]["wmPoiId"]) + str(iNum) + datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d%H%M%S%f")
+            self.crawl(sUrl_comment + "#" + sItag, method="POST", data=response.save["data_comment"], headers=response.save["headers_comment"], itag=sItag, age=0, retries=2, validate_cert=False, callback=self.detail_page_comment)
     
     @config(priority=2)
     def detail_page_comment(self, response):
         """
         解析评价数据
         """
-        try:
-            for each in response.json["data"]["comments"]:
-                cID = each["id"]
-                sSqlJ = r"select 1 from comment_main where erpID = {commentID}".format(commentID=cID)
-                sSqlH = r"insert into comment_main ( erpID, storeID, order_score, food_score, delivery_score, package_score, taste_score, " \
-                    r"ship_score, quality_score, pic_cnt, comment_time, data_time, to_time, ship_duration, over_duration, consumerSName, comment_str ) " \
-                    r"value ( {commentID}, {storeID}, {order_score}, {food_score}, {delivery_score}, {package_score}, {taste_score}, " \
-                    r"{ship_score}, {quality_score}, {pic_cnt}, {comment_time}, {data_time}, {to_time}, {ship_duration}, {over_duration}, '{consumerSName}', '{comment_str}' )".format(
-                        commentID=cID,
-                        storeID=each["wm_poi_id"],
-                        order_score=each["order_comment_score"],
-                        food_score=each["food_comment_score"],
-                        delivery_score=each["delivery_comment_score"],
-                        package_score=each["packaging_score"],
-                        taste_score=each["taste_score"],
-                        ship_score=each["ship_score"],
-                        quality_score=each["quality_score"],
-                        pic_cnt=len(each["picture_urls"]),
-                        comment_time=each["ctime"],
-                        data_time=int(time.time()),
-                        to_time=each["ctime"],
-                        ship_duration=each["ship_time"],
-                        over_duration=each["overDeliveryTime"],
-                        consumerSName=each["username"],
-                        comment_str=str(each["comment"])
+        if type(response.content).__name__ == "bytes":
+            response.content = (response.content).decode('utf-8')
+        if not response or not response.json["data"] or not response.json["data"]["comments"]:
+            return {"info": "获取评价数据失败"}
+        for each in response.json["data"]["comments"]:
+            cID = each["id"]
+            sSqlJ = r"select 1 from comment_main where erpID = {commentID}".format(commentID=cID)
+            sSqlH = r"insert into comment_main ( erpID, storeID, order_score, food_score, delivery_score, package_score, taste_score, " \
+                r"ship_score, quality_score, pic_cnt, comment_time, data_time, to_time, ship_duration, over_duration, consumerSName, comment_str ) " \
+                r"value ( {commentID}, {storeID}, {order_score}, {food_score}, {delivery_score}, {package_score}, {taste_score}, " \
+                r"{ship_score}, {quality_score}, {pic_cnt}, {comment_time}, {data_time}, {to_time}, {ship_duration}, {over_duration}, '{consumerSName}', '{comment_str}' )".format(
+                    commentID=cID,
+                    storeID=each["wm_poi_id"],
+                    order_score=each["order_comment_score"],
+                    food_score=each["food_comment_score"],
+                    delivery_score=each["delivery_comment_score"],
+                    package_score=each["packaging_score"],
+                    taste_score=each["taste_score"],
+                    ship_score=each["ship_score"],
+                    quality_score=each["quality_score"],
+                    pic_cnt=len(each["picture_urls"]),
+                    comment_time=each["ctime"],
+                    data_time=int(time.time()),
+                    to_time=each["ctime"],
+                    ship_duration=each["ship_time"],
+                    over_duration=each["overDeliveryTime"],
+                    consumerSName=each["username"],
+                    comment_str=str(each["comment"])
+                )
+            self.data_handle(sSqlJ, False, sSqlH)
+            # 商品明细
+            if each["orderStatus"]["details"]:
+                self.detail_page_comment_detail(cID, each["wm_poi_id"], each["ctime"], 1, each["orderStatus"]["details"])
+                sSqlH = r"update comment_main set to_time = {to_time} where erpID = {commentID} and to_time > {to_time}".format(
+                        to_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60,
+                        commentID=cID
                     )
-                self.data_handle(sSqlJ, False, sSqlH)
-                # 商品明细
-                if each["orderStatus"]["details"]:
-                    self.detail_page_comment_detail(cID, each["wm_poi_id"], each["ctime"], 1, each["orderStatus"]["details"])
-                    sSqlH = r"update comment_main set to_time = {to_time} where erpID = {commentID} and to_time > {to_time}".format(
-                            to_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60,
-                            commentID=cID
-                        )
-                    self.data_handle("", False, sSqlH)
-                else:
-                    sSqlH = r"update comment_main set from_time = {from_time} where erpID = {commentID} and from_time < {from_time}".format(
-                            from_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60 - 60,
-                            commentID=cID
-                        )
-                    self.data_handle("", False, sSqlH)
-                # 点踩
-                if len(each["critic_food_list"]) > 0:
-                    self.detail_page_comment_detail(cID, each["wm_poi_id"], each["ctime"], 2, each["critic_food_list"])
-                # 点赞
-                if len(each["praise_food_list"]) > 0:
-                    self.detail_page_comment_detail(cID, each["wm_poi_id"], each["ctime"], 3, each["praise_food_list"])
-        except Exception as e:
-            self.operlog(0, 2, -1, None, None, str(e))
+                self.data_handle("", False, sSqlH)
+            else:
+                sSqlH = r"update comment_main set from_time = {from_time} where erpID = {commentID} and from_time < {from_time}".format(
+                        from_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60 - 60,
+                        commentID=cID
+                    )
+                self.data_handle("", False, sSqlH)
+            # 点踩
+            if len(each["critic_food_list"]) > 0:
+                self.detail_page_comment_detail(cID, each["wm_poi_id"], each["ctime"], 2, each["critic_food_list"])
+            # 点赞
+            if len(each["praise_food_list"]) > 0:
+                self.detail_page_comment_detail(cID, each["wm_poi_id"], each["ctime"], 3, each["praise_food_list"])
 
     def detail_page_comment_detail(self, commentID, storeID, comment_time, itemSource, itemList):
         """
         解析评价详情
         """
-        try:
-            for each in itemList:
-                if itemSource == 1:
-                    itemName = each["food_name"]
-                else:
-                    itemName = each
-                sSqlJ = r"select 1 from comment_detail where commentID = {commentID} and itemSource = {itemSource} and itemName = '{itemName}'".format(
-                    commentID=commentID, 
-                    itemSource=itemSource, 
-                    itemName=itemName
-                )
-                sSqlH = r"insert into comment_detail ( commentID, storeID, comment_time, itemSource, itemName ) values ( {commentID}, {storeID}, {comment_time}, {itemSource}, '{itemName}' )".format(
-                    commentID=commentID, 
-                    storeID=storeID, 
-                    comment_time=comment_time, 
-                    itemSource=itemSource, 
-                    itemName=itemName
-                )
-                self.data_handle(sSqlJ, False, sSqlH)
-        except Exception as e:
-            self.operlog(0, 2, -1, None, None, str(e))
+        for each in itemList:
+            if itemSource == 1:
+                itemName = each["food_name"]
+            else:
+                itemName = each
+            sSqlJ = r"select 1 from comment_detail where commentID = {commentID} and itemSource = {itemSource} and itemName = '{itemName}'".format(
+                commentID=commentID, 
+                itemSource=itemSource, 
+                itemName=itemName
+            )
+            sSqlH = r"insert into comment_detail ( commentID, storeID, comment_time, itemSource, itemName ) values ( {commentID}, {storeID}, {comment_time}, {itemSource}, '{itemName}' )".format(
+                commentID=commentID, 
+                storeID=storeID, 
+                comment_time=comment_time, 
+                itemSource=itemSource, 
+                itemName=itemName
+            )
+            self.data_handle(sSqlJ, False, sSqlH)
 
     def on_finished(self, response, task):
         """

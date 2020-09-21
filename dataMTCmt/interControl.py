@@ -76,7 +76,7 @@ class InterControl():
             curService = connService.cursor()
 
             # 逐个处理每个门店
-            lsSql = r"select erpID, name, initFlag, msgScore from store_info where status = 1 order by level desc"
+            lsSql = r"select erpID, name, initFlag, msgScore from store_info where status > 0 order by level desc"
             ldCol = ["storeID", "name", "initFlag", "msgScore"]
             curOrder.execute(lsSql)
             rsTmp = curOrder.fetchall()

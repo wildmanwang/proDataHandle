@@ -96,8 +96,9 @@ class Handler(BaseHandler):
         """
         try:
             cur = self.db.cursor()
-            lsSql = r"insert into oper_log ( storeID, busi_type, step, begin_date, end_date, remark ) " \
-                    r"values ( {storeID}, {busi_type}, {step}, {begin_date}, {end_date}, '{remark}' ) ".format(
+            lsSql = r"insert into oper_log ( oper_time, storeID, busi_type, step, begin_date, end_date, remark ) " \
+                    r"values ( {oper_time}, {storeID}, {busi_type}, {step}, {begin_date}, {end_date}, '{remark}' ) ".format(
+                oper_time=int(time.time()),
                 storeID=storeID,
                 busi_type=busi_type,
                 step=step,

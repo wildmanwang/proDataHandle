@@ -17,7 +17,50 @@ class InterControl():
         self.sett = sett
         self.dbOrder = MYSQL(self.sett.dbOrderHost, self.sett.dbOrderUser, self.sett.dbOrderPassword, self.sett.dbOrderDatabase)
         self.dbService = MYSQL(self.sett.dbServiceHost, self.sett.dbServiceUser, self.sett.dbServicePassword, self.sett.dbServiceDatabase)
+        self.sysParas = {}
+        self.getSysParas()
         self.msgSrv = MsgJYKX()
+        self.msgSrv.sysParas = self.sysParas
+
+    def getSysParas(self):
+        """
+        获取系统参数
+        """
+        rtnData = {
+            "result": False,  # 逻辑控制 True/False
+            "info": "",  # 信息
+            "dataString": "",  # 字符串
+            "dataNumber": 0,  # 数字
+            "entities": {}
+        }
+        ibConn = False
+        try:
+            conn = self.dbOrder.GetConnect()
+            ibConn = True
+            cur = conn.cursor()
+
+            # 服务商标志
+            lsSql = r"select paraValue from sys_paras where paraCode='{paraCode}'".format(paraCode="serviceFlag")
+            cur.execute(lsSql)
+            rsTmp = cur.fetchall()
+            if len(rsTmp) > 0:
+                self.sysParas["serviceFlag"] = rsTmp[0][0]
+            else:
+                self.sysParas["serviceFlag"] = ""
+
+            # 错误日志接收者
+            lsSql = r"select paraValue from sys_paras where paraCode='{paraCode}'".format(paraCode="errLogRecipient")
+            cur.execute(lsSql)
+            rsTmp = cur.fetchall()
+            if len(rsTmp) > 0:
+                lsTmp = rsTmp[0][0]
+            else:
+                lsTmp = ""
+            self.sysParas["errLogRecipient"] = [int(i) for i in lsTmp.split(";")]
+        finally:
+            if ibConn:
+                conn.close()
+        return rtnData
 
     def dataHandle(self, storeID):
         """
@@ -44,7 +87,7 @@ class InterControl():
             ibConnService = True
             curService = connService.cursor()
 
-            # 评价记录开始时间：今天-3
+            # 评价记录开始时间：今天-1
             sDate = time.strftime("%Y-%m-%d", time.localtime(int(time.time()) - 60 * 60 * 24 * 1))
             timeCmt = int(time.mktime(time.strptime(sDate, "%Y-%m-%d")))
 
@@ -113,7 +156,7 @@ class InterControl():
                 # 发送消息
                 if len(rsMsg) > 0 or len(rsMsg) == 0 and iCntAll > 0 and sDate > rcStore["lastSend"]:
                     for reci in rcStore["recipient"].split(";"):
-                        rtnData = self.msgSrv.send_msg(reci, rcStore["name"], msgs, iCntBad, msgFlag)
+                        rtnData = self.msgSrv.sendMsgCmt(reci, rcStore["name"], msgs, iCntBad, msgFlag)
                         if not rtnData["result"]:
                             raise Exception(rtnData["info"])
                         for msgItem in msgs:
@@ -134,6 +177,7 @@ class InterControl():
                         connOrder.commit()
             rtnData["result"] = True
         except Exception as e:
+            rtnData["result"] = False
             if ibConnOrder:
                 connOrder.rollback()
             if ibConnService:
@@ -147,14 +191,50 @@ class InterControl():
 
         return rtnData
 
-    def sendMsg(self, person, msg):
+    def errLogSend(self):
         """
-        发消息
-        :param person:
-        :param msg:
-        :return:
+        错误日志报警
         """
-        pass
+        rtnData = {
+            "result": False,  # 逻辑控制 True/False
+            "info": "",  # 信息
+            "dataString": "",  # 字符串
+            "dataNumber": 0,  # 数字
+            "entities": {}
+        }
+        ibConn = False
+        try:
+            conn = self.dbOrder.GetConnect()
+            ibConn = True
+            cur = conn.cursor()
+
+            # 日志记录开始时间：今天
+            sDate = time.strftime("%Y-%m-%d", time.localtime(int(time.time())))
+            timeCmt = int(time.mktime(time.strptime(sDate, "%Y-%m-%d")))
+            lsSql = r"select oper_time, storeID, busi_type, step, begin_date, end_date, remark from oper_log where oper_time >= {oper_time} and step = -1 and status = 0".format(
+                oper_time=timeCmt
+            )
+            ldCol = ["oper_time", "storeID", "busi_type", "step", "begin_date", "end_date", "remark"]
+            cur.execute(lsSql)
+            rsTmp = cur.fetchall()
+            rsLog = [dict(zip(ldCol, line)) for line in rsTmp]
+            rtnData = self.msgSrv.sendMsgLog(rsLog)
+            if not rtnData["result"]:
+                raise Exception(rtnData["info"])
+            lsSql = r"update oper_log set status=1 where oper_time >= {oper_time} and step = -1 and status = 0".format(
+                oper_time=timeCmt
+            )
+            cur.execute(lsSql)
+            conn.commit()
+        except Exception as e:
+            rtnData["result"] = False
+            if ibConn:
+                conn.rollback()
+        finally:
+            if ibConn:
+                conn.close()
+
+        return rtnData
 
 if __name__ == "__main__":
     import os, sys
@@ -165,4 +245,6 @@ if __name__ == "__main__":
     sett = Settings(sPath, "config")
     inter = InterControl(sett)
     rtn = inter.dataHandle(0)
+    print(rtn)
+    rtn = inter.errLogSend()
     print(rtn)

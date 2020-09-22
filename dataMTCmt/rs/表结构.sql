@@ -6,8 +6,6 @@ CREATE TABLE `store_info` (
   `loginAcc` varchar(45) DEFAULT NULL,
   `loginPwd` varchar(45) DEFAULT NULL,
   `recipient` varchar(45) DEFAULT NULL,
-  `lastCrawled` varchar(10) DEFAULT NULL,
-  `lastHandled` varchar(10) DEFAULT NULL,
   `lastSend` varchar(10) DEFAULT NULL,
   `initFlag` tinyint NOT NULL DEFAULT '0',
   `level` tinyint NOT NULL,

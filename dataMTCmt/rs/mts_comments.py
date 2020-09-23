@@ -23,97 +23,16 @@ class Handler(BaseHandler):
             "password": "0Wangle?",
             "dbname": "mt_orderinfo"
         }
-
-    def source_replace(self, source, key, value):
-        li_pos = source.find(key + "=")
-        if li_pos > 0:
-            li_len = source[li_pos:].find(";")
-            if li_len > 0:
-                return source[:li_pos] + key + "=" + value + source[li_pos + li_len:]
-            else:
-                return source[:li_pos] + key + "=" + value
-        else:
-            return source
-
-    def source_parse(self, strList):
-        varDict = {}
-        for strSource in strList:
-            for line in strSource.split('; '):
-                key, value = line.split('=', 1)
-                varDict[key] = value
-        return varDict
-
-    def data_handle(self, sJudge, bType, sHandle):
-        """
-        数据库操作：
-        sJudge——判断SQL语句，是否存在这样的记录
-        bType——True记录存在则处理，不存在不处理；False记录存在则不处理，不存在则处理
-        sHandle——处理SQL语句
-        """
-        try:
-            cur = self.db.cursor()
-            cur.execute("set names utf8mb4")
-            cur.execute("SET CHARACTER SET utf8mb4")
-            cur.execute("SET character_set_connection=utf8mb4")
-            if len(sJudge) > 0:
-                cur.execute(sJudge)
-                rsData = cur.fetchall()
-                if (len(rsData) > 0 and bType) or (len(rsData) == 0 and not bType):
-                    cur.execute(sHandle)
-                    self.db.commit()
-            else:
-                cur.execute(sHandle)
-                self.db.commit()
-        except Exception as e:
-            self.operlog(0, 2, -1, None, None, str(e))
-            self.db.rollback()
+        # 处理哪种状态的商家
+        self.storeStatus = 1
     
-    def data_select(self, sSelect, sCols):
-        """
-        获取数据集
-        """
-        try:
-            cur = self.db.cursor()
-            cur.execute("set names utf8mb4")
-            cur.execute("SET CHARACTER SET utf8mb4")
-            cur.execute("SET character_set_connection=utf8mb4")
-            cur.execute(sSelect)
-            rsTmp = cur.fetchall()
-            rsData = [dict(zip(sCols, line)) for line in rsTmp]
-        except Exception as e:
-            self.operlog(0, 2, -1, None, None, str(e))
-        return rsData
-    
-    def operlog(self, storeID, busi_type, step, begin_date, end_date, remark):
-        """
-        参数：
-        storeID     门店ID
-        busi_type   所属业务类型：1 订单 2 评价
-        step        阶段：1 任务启动 2 数据抓取 -1 异常产生 0 任务结束
-        begin_date  业务开始日期
-        end_date    业务截止日期
-        remark      备注
-        """
-        try:
-            cur = self.db.cursor()
-            lsSql = r"insert into oper_log ( oper_time, storeID, busi_type, step, begin_date, end_date, remark ) " \
-                    r"values ( {oper_time}, {storeID}, {busi_type}, {step}, {begin_date}, {end_date}, '{remark}' ) ".format(
-                oper_time=int(time.time()),
-                storeID=storeID,
-                busi_type=busi_type,
-                step=step,
-                begin_date="{val}".format(val=("'" + begin_date + "'" if begin_date else 'NULL')),
-                end_date="{val}".format(val=("'" + end_date + "'" if end_date else 'NULL')),
-                remark=remark
-            )
-            cur.execute(lsSql)
-            self.db.commit()
-        except Exception as e:
-            print(str(e))
-            self.db.rollback()
-    
-    @every(minutes=24 * 60 * 1000)
+    @every(minutes=4 * 60)
     def on_start(self):
+        """
+        任务策略
+            每日07:00开启任务，随机延后0-10分钟
+            在06:40至23:00之间，每4小时启动一次
+        """
         self.bConnected = False
         try:
             self.db = pymysql.connect(
@@ -125,8 +44,19 @@ class Handler(BaseHandler):
                 use_unicode=True
             )
             self.bConnected = True
+            self.init_paras()
+            if self.storeStatus == 1:
+                # 是否在有效时间范围内
+                lsNow = datetime.datetime.strftime(datetime.datetime.now(), "%H:%M")
+                if lsNow < self.sysParas["crawlCmtBegin"] or lsNow > self.sysParas["crawlCmtEnd"]:
+                    return {"info": "不在有效时间内"}
+                # 随机延时
+                time.sleep(random.randint(5,600))
             self.operlog(0, 2, 1, None, None, "")
-            lsSql = r"select erpID, initFlag, cookie_order, cookie_comment from store_info where status = 1 and cookie_order is not null and cookie_comment is not null order by level asc, createTime asc"
+            lsSql = r"select erpID, initFlag, cookie_order, cookie_comment from store_info where status = {status} " \
+                    r"and cookie_order is not null and cookie_comment is not null order by level asc, createTime asc".format(
+                    status=self.storeStatus
+                )
             ldCol = ["storeID", "initFlag", "cookie_order", "cookie_comment"]
             rsStore = self.data_select(lsSql, ldCol)
             for rcStore in rsStore:
@@ -140,11 +70,11 @@ class Handler(BaseHandler):
 
                 strParse = []
                 storeVar["cookie_order"] = rcStore["cookie_order"]
-                storeVar["cookie_order"] = self.source_replace(storeVar["cookie_order"], "setPrivacyTime", "1_" + datetime.datetime.strftime(datetime.date.today(), "%Y%m%d"))
+                storeVar["cookie_order"] = self._source_replace(storeVar["cookie_order"], "setPrivacyTime", "1_" + datetime.datetime.strftime(datetime.date.today(), "%Y%m%d"))
                 strParse.append(storeVar["cookie_order"])
                 storeVar["cookie_comment"] = rcStore["cookie_comment"]
                 strParse.append(storeVar["cookie_comment"])
-                storeVar["varDict"] = self.source_parse(strParse)
+                storeVar["varDict"] = self._source_parse(strParse)
                 
                 storeVar["refer_comment"] = r"https://waimaieapp.meituan.com/frontweb/userComment?" \
                     r"_source=PC&token={token}&acctId={acctId}&wmPoiId={wmPoiId}&region_id={region_id}" \
@@ -303,6 +233,147 @@ class Handler(BaseHandler):
                 self.data_handle(sSqlJ, False, sSqlH)
         except Exception as e:
             self.operlog(0, 2, -1, None, None, str(e))
+
+    def _source_replace(self, source, key, value):
+        li_pos = source.find(key + "=")
+        if li_pos > 0:
+            li_len = source[li_pos:].find(";")
+            if li_len > 0:
+                return source[:li_pos] + key + "=" + value + source[li_pos + li_len:]
+            else:
+                return source[:li_pos] + key + "=" + value
+        else:
+            return source
+
+    def _source_parse(self, strList):
+        varDict = {}
+        for strSource in strList:
+            for line in strSource.split('; '):
+                key, value = line.split('=', 1)
+                varDict[key] = value
+        return varDict
+    
+    def _get_para(self, sPara, sDefault):
+        """
+        获取参数值
+        """
+        try:
+            cur = self.db.cursor()
+            cur.execute(r"select paraValue from sys_paras where paraCode='{paraCode}'".format(paraCode=sPara))
+            rsTmp = cur.fetchall()
+            if len(rsTmp) == 1:
+                sRtn = rsTmp[0][0]
+            else:
+                sRtn = sDefault
+        except Exception as e:
+            self.operlog(0, 2, -1, None, None, str(e))
+        return sRtn
+    
+    def _datetimeStrValid(self, sValue, sFormat):
+        try:
+            datetime.datetime.strptime(sValue, sFormat)
+            return True
+        except ValueError:
+            return False
+
+    def data_handle(self, sJudge, bType, sHandle):
+        """
+        数据库操作：
+        sJudge——判断SQL语句，是否存在这样的记录
+        bType——True记录存在则处理，不存在不处理；False记录存在则不处理，不存在则处理
+        sHandle——处理SQL语句
+        """
+        try:
+            cur = self.db.cursor()
+            cur.execute("set names utf8mb4")
+            cur.execute("SET CHARACTER SET utf8mb4")
+            cur.execute("SET character_set_connection=utf8mb4")
+            if len(sJudge) > 0:
+                cur.execute(sJudge)
+                rsData = cur.fetchall()
+                if (len(rsData) > 0 and bType) or (len(rsData) == 0 and not bType):
+                    cur.execute(sHandle)
+                    self.db.commit()
+            else:
+                cur.execute(sHandle)
+                self.db.commit()
+        except Exception as e:
+            self.operlog(0, 2, -1, None, None, str(e))
+            self.db.rollback()
+    
+    def data_select(self, sSelect, sCols):
+        """
+        获取数据集
+        """
+        try:
+            cur = self.db.cursor()
+            cur.execute("set names utf8mb4")
+            cur.execute("SET CHARACTER SET utf8mb4")
+            cur.execute("SET character_set_connection=utf8mb4")
+            cur.execute(sSelect)
+            rsTmp = cur.fetchall()
+            rsData = [dict(zip(sCols, line)) for line in rsTmp]
+        except Exception as e:
+            self.operlog(0, 2, -1, None, None, str(e))
+        return rsData
+    
+    def init_paras(self):
+        """
+        初始化参数
+        """
+        self.sysParas = {}
+        # 评价爬虫启动时间
+        sTmp = self._get_para("crawlCmtStart", "07:00")
+        if self._datetimeStrValid(sTmp, "%H:%M"):
+            self.sysParas["crawlCmtStart"] = sTmp
+        else:
+            self.sysParas["crawlCmtStart"] = "07:00"
+        # 评价爬虫周期
+        sTmp = self._get_para("crawlCmtEvery", "4")
+        if sTmp.isdigit():
+            self.sysParas["crawlCmtEvery"] = int(sTmp)
+        else:
+            self.sysParas["crawlCmtEvery"] = 4
+        # 评价爬虫有效开始时间
+        sTmp = self._get_para("crawlCmtBegin", "06:40")
+        if self._datetimeStrValid(sTmp, "%H:%M"):
+            self.sysParas["crawlCmtBegin"] = sTmp
+        else:
+            self.sysParas["crawlCmtBegin"] = "06:40"
+        # 评价爬虫有效截止时间
+        sTmp = self._get_para("crawlCmtEnd", "23:00")
+        if self._datetimeStrValid(sTmp, "%H:%M"):
+            self.sysParas["crawlCmtEnd"] = sTmp
+        else:
+            self.sysParas["crawlCmtEnd"] = "23:00"
+    
+    def operlog(self, storeID, busi_type, step, begin_date, end_date, remark):
+        """
+        参数：
+        storeID     门店ID
+        busi_type   所属业务类型：1 订单 2 评价
+        step        阶段：1 任务启动 2 数据抓取 -1 异常产生 0 任务结束
+        begin_date  业务开始日期
+        end_date    业务截止日期
+        remark      备注
+        """
+        try:
+            cur = self.db.cursor()
+            lsSql = r"insert into oper_log ( oper_time, storeID, busi_type, step, begin_date, end_date, remark ) " \
+                    r"values ( {oper_time}, {storeID}, {busi_type}, {step}, {begin_date}, {end_date}, '{remark}' ) ".format(
+                oper_time=int(time.time()),
+                storeID=storeID,
+                busi_type=busi_type,
+                step=step,
+                begin_date="{val}".format(val=("'" + begin_date + "'" if begin_date else 'NULL')),
+                end_date="{val}".format(val=("'" + end_date + "'" if end_date else 'NULL')),
+                remark=remark
+            )
+            cur.execute(lsSql)
+            self.db.commit()
+        except Exception as e:
+            print(str(e))
+            self.db.rollback()
 
     def on_finished(self, response, task):
         """

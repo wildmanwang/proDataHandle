@@ -48,6 +48,8 @@ class InterControl():
         * 超时时间怎么计算？暂定=（送达时间秒-预计送达时间秒）/60四舍五入                   把握：30%
         * 有商品明细的评价，是否可以有两个相同的商品？不可以                               把握：80%，待实际测试
         * 有踩赞明细的评价，实际商品数是否可以大于踩赞商品数？可以                          把握：90%，待实际测试
+        【任务策略】
+            每日09:00启动任务
         :return:
         """
         # MYSQL
@@ -76,7 +78,7 @@ class InterControl():
             curService = connService.cursor()
 
             # 逐个处理每个门店
-            lsSql = r"select erpID, name, initFlag, msgScore from store_info where status > 0 order by level desc"
+            lsSql = r"select erpID, name, initFlag, msgScore from store_info where status > 0 order by level"
             ldCol = ["storeID", "name", "initFlag", "msgScore"]
             curOrder.execute(lsSql)
             rsTmp = curOrder.fetchall()

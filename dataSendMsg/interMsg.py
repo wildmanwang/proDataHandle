@@ -174,7 +174,7 @@ class MsgJYKX():
                     'color': '#173177'
                 },
                 'keyword3': {
-                    'value': '昨日共产生{cnt}条异常日志'.format(cnt=len(msgs)),
+                    'value': '当前共{cnt}条异常日志'.format(cnt=len(msgs)),
                     'color': '#173177'
                 },
                 'remark': {

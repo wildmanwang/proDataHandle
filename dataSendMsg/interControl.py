@@ -64,6 +64,8 @@ class InterControl():
 
     def dataHandle(self, storeID):
         """
+        【任务策略】
+            每日09:30启动任务
         :return:
         """
         rtnData = {
@@ -95,7 +97,7 @@ class InterControl():
             if storeID > 0:
                 lsSql = r"select erpID, name, recipient, IFNULL(lastSend, ''), msgScore from store_info where erpID={storeID} and recipient>0".format(storeID=storeID)
             else:
-                lsSql = r"select erpID, name, recipient, IFNULL(lastSend, ''), msgScore from store_info where status=1 and recipient>0 order by level desc"
+                lsSql = r"select erpID, name, recipient, IFNULL(lastSend, ''), msgScore from store_info where status=1 and recipient>0 order by level"
             ldCol = ["storeID", "name", "recipient", "lastSend", "msgScore"]
             curOrder.execute(lsSql)
             rsTmp = curOrder.fetchall()
@@ -218,14 +220,17 @@ class InterControl():
             cur.execute(lsSql)
             rsTmp = cur.fetchall()
             rsLog = [dict(zip(ldCol, line)) for line in rsTmp]
-            rtnData = self.msgSrv.sendMsgLog(rsLog)
-            if not rtnData["result"]:
-                raise Exception(rtnData["info"])
-            lsSql = r"update oper_log set status=1 where oper_time >= {oper_time} and step = -1 and status = 0".format(
-                oper_time=timeCmt
-            )
-            cur.execute(lsSql)
-            conn.commit()
+            if len(rsLog) > 0:
+                rtnData = self.msgSrv.sendMsgLog(rsLog)
+                if not rtnData["result"]:
+                    raise Exception(rtnData["info"])
+                lsSql = r"update oper_log set status=1 where oper_time >= {oper_time} and step = -1 and status = 0".format(
+                    oper_time=timeCmt
+                )
+                cur.execute(lsSql)
+                conn.commit()
+            else:
+                rtnData["result"] = True
         except Exception as e:
             rtnData["result"] = False
             if ibConn:

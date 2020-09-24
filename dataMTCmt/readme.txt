@@ -62,10 +62,12 @@ https://blog.csdn.net/weixin_42935779/article/details/104187454
 https://www.cnblogs.com/sunxiuwen/p/9655932.html
 解决mysql客户端安装及版本错误的问题：
 https://blog.csdn.net/lvluobo/article/details/107850673
-自动创建爬虫任务：
+自动创建爬虫任务相关：
 https://www.py.cn/faq/python/17827.html
 https://www.cnblogs.com/lincappu/p/12911412.html
 https://www.cnblogs.com/chengxuyuanaa/p/12042083.html
+apache多服务：
+https://blog.csdn.net/qq_14980415/article/details/81697873
 
 problem:
     美团服务几点中断？仅一次发现中断，在23:58左右

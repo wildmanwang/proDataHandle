@@ -1,21 +1,21 @@
 select sID, erpID, ship_duration, comment_time, userName, comment_str, order_score, taste_score, delivery_score from mt_orderinfo.comment_main where left(from_unixtime(comment_time), 10) >= '2020-08-26' order by sID desc;
-select sID, userName, comment_str, order_score, food_score, taste_score, delivery_score, package_score, comment_time, from_time, to_time, ship_duration, over_duration from comment_main where erpID = 3681635396;
-select * from comment_detail where commentID = 3681635396;
+select sID, storeID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration, consumerSName, comment_str from comment_main where erpID = 3706461169;
+select * from comment_detail where commentID = 3706461169;
 select	erpID, 
 		num,
 		from_unixtime(order_time) 下单时间,
 		from_unixtime(delivery_time) 送达时间,
-		from_unixtime(1600166334) 评价时间,
+		from_unixtime(1600829587) 评价时间,
 		(estimate_arrival_time - order_time)/60 预计时长,
 		(delivery_time - order_time)/60 实际时长（按秒）,
         ceil((delivery_time - order_time)/60) 实际时长（按秒进位）,
 		floor(delivery_time/60) - floor(order_time/60) 实际时长（按分舍尾）,
 		round(delivery_time/60) - round(order_time/60) 实际时长（按分舍入）,
 		ceil(delivery_time/60) - ceil(order_time/60) 实际时长（按分进位）,
-        (((1600166334 - delivery_time)/60)/60)/24 收到多久评价,
-        (1600166334 - delivery_time)/60 收到多久评价 
-from order_main where storeID=9294190 and delivery_time < 1600166334 and delivery_time - order_time > 20 * 60 and delivery_time - order_time < 26 * 60 
-and order_time between 1600041913 and 1600166334 and estimate_arrival_time > delivery_time order by delivery_time;
+        (((1600829587 - delivery_time)/60)/60)/24 收到多久评价,
+        (1600829587 - delivery_time)/60 收到多久评价 
+from order_main where storeID=9294190 and delivery_time < 1600829587 and delivery_time - order_time > 28 * 60 and delivery_time - order_time < 34 * 60 
+and order_time between 1600734801 and 1600829587 and estimate_arrival_time > delivery_time order by delivery_time;
 and erpID in (select orderID from t2) and estimate_arrival_time < delivery_time;
 from order_main where erpID = 88679291308600109;
 and abs((((1598195195 - delivery_time)/60)/60)/24 - round((((1598195195 - delivery_time)/60)/60)/24)) < 0.1 order by abs((((1598195195 - delivery_time)/60)/60)/24 - round((((1598195195 - delivery_time)/60)/60)/24)) asc;

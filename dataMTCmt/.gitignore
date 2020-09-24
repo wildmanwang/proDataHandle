@@ -2,6 +2,8 @@
 __pycache__
 build
 venv
+srvPackage
+bak
 
 *.rar
 *.spec

@@ -106,13 +106,13 @@ class Handler(BaseHandler):
                         region_version=storeVar["varDict"]["region_version"]
                     )
                 sItag = str(rcStore["storeID"]) + storeVar["sDate8EndOrder"] + "9999"
-                self.crawl(sUrl_order + "#" + sItag, headers=storeVar["headers_order"], itag=sItag, age=2*60, retries=2, callback=self.index_page, save=storeVar)
+                self.crawl(sUrl_order + "#" + sItag, headers=storeVar["headers_order"], itag=sItag, age=3, retries=2, callback=self.index_page, save=storeVar)
                 self.operlog(rcStore["storeID"], 1, 2, storeVar["sDate10StartOrder"], storeVar["sDate10EndOrder"], "")
                 time.sleep(random.randint(5,15))
         except Exception as e:
             self.operlog(0, 1, -1, None, None, str(e))
 
-    @config(age=2 * 60)
+    @config(age=3)
     def index_page(self, response):
         try:
             if type(response.content).__name__ == "bytes":
@@ -121,8 +121,9 @@ class Handler(BaseHandler):
                 if not response.json["data"]:
                     self.operlog(response.save["varDict"]["wmPoiId"], 1, -1, None, None, "获取订单信息失败：无json数据")
                     return {"info": "获取订单信息失败：无json数据"}
-                self.detail_page_order(response)
                 iLen = len(response.json["data"]["wmOrderList"])
+                if iLen > 0:
+                    self.detail_page_order(response)
                 if iLen >= 10:
                     iNum = response.json["data"]["wmOrderList"][9]["num"]
                     if iNum == 11:
@@ -142,7 +143,7 @@ class Handler(BaseHandler):
                             )
                         sItag = str(response.save["varDict"]["wmPoiId"]) + sDateSpc8 + str(iNum)
                         time.sleep(random.randint(5,15))
-                        self.crawl(sUrl + "#" + sItag, headers=response.save["headers_order"], itag=sItag, age=2*60, retries=1, callback=self.index_page, save=response.save)
+                        self.crawl(sUrl + "#" + sItag, headers=response.save["headers_order"], itag=sItag, age=3, retries=1, callback=self.index_page, save=response.save)
             else:
                 # code=1001     登录过期，需要重新登录
                 self.operlog(response.save["varDict"]["wmPoiId"], 1, -1, None, None, "错误[{code}]：{msg}".format(code=response.json["code"], msg=response.json["msg"]))
@@ -212,16 +213,16 @@ class Handler(BaseHandler):
                 region_id=response.save["varDict"]["region_id"],
                 region_version=response.save["varDict"]["region_version"]
             )
-            self.crawl(sUrl_prepare, headers=response.save["headers_order"], age=0, retries=1, callback=self.detail_page_prepare)
+            self.crawl(sUrl_prepare, headers=response.save["headers_order"], age=3, retries=1, callback=self.detail_page_prepare)
             sUrl_delivery += r"%5D&region_id={region_id}&region_version={region_version}".format(
                 region_id=response.save["varDict"]["region_id"],
                 region_version=response.save["varDict"]["region_version"]
             )
-            self.crawl(sUrl_delivery, headers=response.save["headers_order"], age=0, retries=1, callback=self.detail_page_delivery)
+            self.crawl(sUrl_delivery, headers=response.save["headers_order"], age=3, retries=1, callback=self.detail_page_delivery)
             # 注释以下3行代码，暂不需要抓取结算数据
             # sData = json.dumps(listSettle, ensure_ascii = False).replace(' ', '')
             # sItag = str(response.save["varDict"]["wmPoiId"]) + datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d%H%M%S%f") + str(cID)
-            # self.crawl(sUrl_settle + "#" + sItag, method="POST", data={"chargeInfo": sData}, headers=response.save["headers_settle"], itag=sItag, age=0, retries=1, callback=self.detail_page_settle)
+            # self.crawl(sUrl_settle + "#" + sItag, method="POST", data={"chargeInfo": sData}, headers=response.save["headers_settle"], itag=sItag, age=3, retries=1, callback=self.detail_page_settle)
         except Exception as e:
             self.operlog(0, 1, -1, None, None, str(e))
 

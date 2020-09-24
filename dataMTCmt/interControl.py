@@ -145,7 +145,7 @@ class InterControl():
                     sInfo = ""
 
                     # 调试代码
-                    if rcCmt["commentID"] == 3597179082:
+                    if rcCmt["commentID"] == 3706461169:
                         iDebug = 0
 
                     # 时间范围匹配：评价起止时间范围
@@ -482,13 +482,13 @@ class InterControl():
             sInfo += "H2-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
             if len(lTmp) > 0:
                 lOrder = lTmp
-            elif len(lTmp) > 1:
+            if len(lTmp) > 1:
                 # 送达30秒后评价更常见
                 lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] >= 30)]
                 sInfo += "H2-2:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
                 if len(lTmp) > 0:
                     lOrder = lTmp
-                elif len(lTmp) > 1:
+                if len(lTmp) > 1:
                     # 30分钟内评价更常见
                     lTmp = [i for i in lTmp if (tCmt - i["delivery_time"] <= 30 * 60)]
                     sInfo += "H2-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
@@ -510,10 +510,17 @@ class InterControl():
         tCmt = rcCmt["comment_time"]
         lTmp = []
 
+        # 当天评价
+        if len(lTmp) == 0:
+            lTmp = [i for i in lOrder if ( self._getDay(i["delivery_time"]) == self._getDay(tCmt))]
+            sInfo += "X1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+            if len(lTmp) == 1:
+                lOrder = lTmp
+
         # 不同日期，日期相差不过7天，送达与评价绝对值相差指定时长内，只有一个订单
         if len(lTmp) == 0:
             lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] > 7 * 60 * 60 and tCmt - i["delivery_time"] < (7 * 24 + 1) * 60 * 60 and abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 90 * 60)]
-            sInfo += "X1-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+            sInfo += "X2-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
             if len(lTmp) == 1:
                 lOrder = lTmp
             elif len(lTmp) > 1:
@@ -523,7 +530,7 @@ class InterControl():
                     lOrder = lTmp
                 elif len(lTmp) > 1:
                     lTmp = [i for i in lTmp if (abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 30 * 60)]
-                    sInfo += "X3-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
+                    sInfo += "X2-3:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
                     if len(lTmp) == 1:
                         lOrder = lTmp
 
@@ -557,6 +564,14 @@ class InterControl():
         3 删除数据前按月统计完成率
         """
         pass
+
+    def _getDay(self, iTime):
+        """
+        获取时间戳日
+        :param iTime:
+        :return:
+        """
+        return int(time.strftime("%Y%m%d", time.localtime(iTime)))
 
     def _getHour(self, iTime):
         """

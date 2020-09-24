@@ -118,13 +118,13 @@ class Handler(BaseHandler):
                 # 获取评价
                 sUrl_comment = r"https://waimaieapp.meituan.com/gw/api/customer/comment/r/list?ignoreSetRouterProxy=true"
                 sItag = str(rcStore["storeID"]) + "1" + datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d%H%M%S%f")
-                self.crawl(sUrl_comment + "#" + sItag, method="POST", data=storeVar["data_comment"], headers=storeVar["headers_comment"], itag=sItag, age=2*60, retries=2, validate_cert=False, callback=self.index_comment, save=storeVar)
+                self.crawl(sUrl_comment + "#" + sItag, method="POST", data=storeVar["data_comment"], headers=storeVar["headers_comment"], itag=sItag, age=3, retries=2, validate_cert=False, callback=self.index_comment, save=storeVar)
                 self.operlog(rcStore["storeID"], 2, 2, storeVar["sDate10StartComment"], storeVar["sDate10EndComment"], "")
                 time.sleep(random.randint(5,15))
         except Exception as e:
             self.operlog(0, 2, -1, None, None, str(e))
 
-    @config(age=2 * 60)
+    @config(age=3)
     def index_comment(self, response):
         try:
             if type(response.content).__name__ == "bytes":
@@ -145,7 +145,7 @@ class Handler(BaseHandler):
                     response.save["data_comment"]["pageNum"] = str(pageNum)
                     time.sleep(random.randint(5,15))
                     sItag = str(response.save["varDict"]["wmPoiId"]) + str(pageNum) + datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d%H%M%S%f")
-                    self.crawl(sUrl_comment + "#" + sItag, method="POST", data=response.save["data_comment"], headers=response.save["headers_comment"], itag=sItag, age=0, retries=1, validate_cert=False, callback=self.index_comment)
+                    self.crawl(sUrl_comment + "#" + sItag, method="POST", data=response.save["data_comment"], headers=response.save["headers_comment"], itag=sItag, age=3, retries=1, validate_cert=False, callback=self.index_comment)
             else:
                 # code=1001     登录过期，需要重新登录
                 self.operlog(response.save["varDict"]["wmPoiId"], 2, -1, None, None, "错误[{code}]：{msg}".format(code=response.json["code"], msg=response.json["msg"]))

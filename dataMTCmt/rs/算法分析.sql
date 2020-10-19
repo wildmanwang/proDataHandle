@@ -1,6 +1,6 @@
 select sID, erpID, ship_duration, comment_time, userName, comment_str, order_score, taste_score, delivery_score from mt_orderinfo.comment_main where left(from_unixtime(comment_time), 10) >= '2020-08-26' order by sID desc;
-select sID, storeID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration, consumerSName, comment_str from comment_main where erpID = 3706461169;
-select * from comment_detail where commentID = 3706461169;
+select sID, storeID, comment_str, order_score, comment_time, from_time, to_time, ship_duration, over_duration, consumerSName, comment_str from comment_main where erpID = 3745759421;
+select * from comment_detail where commentID = 3745759421;
 select	erpID, 
 		num,
 		from_unixtime(order_time) 下单时间,
@@ -25,10 +25,7 @@ select erpID, from_unixtime(order_time), num from order_main where erpID = 88679
 select * from order_main where erpID = 88679291515054965;
 select * from order_detail where orderID in (88679292318167656);
 
-招牌！香辣牛肉面（大）
-【可口可乐】(需配面条，单点不送哦）
-地道烤肉肠（1根）（单点不送）
-收藏❥店铺，你敢点我敢送【每天不重样】（每单只限1份哦）
+番茄肥牛丼饭，只用无菌蛋！温泉蛋拌饭！番茄味甜口）
 
 truncate table t1;
 truncate table t2;
@@ -37,8 +34,8 @@ select * from t1;
 select * from t2;
 
 insert t2( orderID ) 
-select distinct orderID from mt_orderinfo.order_detail where order_time between 1598665515 and 1598723367 and orderID in (select orderID from t1) and itemName like '地道烤肉肠（1根）（单点不送）%';
-select distinct orderID from mt_orderinfo.order_detail where order_time between 1598665515 and 1598723367 group by orderID having count(*) >= 4;
+select distinct orderID from mt_orderinfo.order_detail where storeID=9294190 and order_time between 1598665515 and 1598723367 and orderID in (select orderID from t1) and itemName like '地道烤肉肠（1根）（单点不送）%';
+select distinct orderID from mt_orderinfo.order_detail where storeID=9294190 and order_time between 1598665515 and 1598723367 group by orderID having count(*) >= 4;
 
 update mt_orderinfo.comment_main set orderID = 0 where sID = 1;
 

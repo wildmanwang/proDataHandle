@@ -68,6 +68,12 @@ https://www.cnblogs.com/lincappu/p/12911412.html
 https://www.cnblogs.com/chengxuyuanaa/p/12042083.html
 apache多服务：
 https://blog.csdn.net/qq_14980415/article/details/81697873
+pyspider安装：
+https://blog.csdn.net/shawroad88/article/details/82222811
+代理IP：
+crawl_config = {"proxy": "18.18.18.18:80"}
+https://www.zhihu.com/question/55807309/answer/398044805
+https://www.zhihu.com/question/47464143
 
 problem:
     美团服务几点中断？仅一次发现中断，在23:58左右
@@ -75,9 +81,15 @@ problem:
     订单一次能查多少数据？超过62后面的取不到，导致初始化店铺无法一次性查6天
 
 技术问题：
-报错：'cryptography' package is required for sha256_password or caching_sha2_password auth methods
+运行pyspider爬虫报错：'cryptography' package is required for sha256_password or caching_sha2_password auth methods
     解决：重启电脑，mysql服务器有问题
     原因：未知
-错误：抓取的数据整页中文乱码，其他页面正常
+pyspider获取的json数据错误：抓取的数据整页中文乱码，其他页面正常
     解决：抓取到数据后，增加语句response.content = (response.content).decode('utf-8')
     原因：pyspider内置的pyquery没有正确的解析目标站的编码，导致的解码失败；这就是 lxml 的蛋疼之处，给它 unicode 它有的时候它不认，给它 bytes 它又处理不好
+启动pyspider报错：ValueError: Invalid configuration:Deprecated option 'domaincontroller': use 'http_authenticator.domain_controller' instead
+    解决：pip3 install wsgidav==2.4.1
+    原因：WsgiDAV发布了版本pre-release 3.x导致的，只需要把版本降下来就好了
+阿里云端口开放无效
+    解决：现在windows服务器【防火墙-》高级-》入站规则】中增加入站端口，再在阿里云安全组中增加入站端口即可
+    原因：阿里云的入站规则是在操作系统之外额外的规则，因此两个地方都需要配置

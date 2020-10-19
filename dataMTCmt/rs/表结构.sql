@@ -88,6 +88,13 @@ CREATE TABLE `comment_detail` (
   PRIMARY KEY (`sID`)
 ) ENGINE=InnoDB AUTO_INCREMENT=3072 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE `consumer_info` (
+  `consumerID` bigint NOT NULL,
+  `consumerSName` varchar(45) NOT NULL,
+  PRIMARY KEY (`consumerID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+select CONCAT("insert into consumer_info ( consumerID, consumerSName ) values ( ", CONCAT(consumerID, ""), ", '", consumerSName, "');") from consumer_info;
+
 CREATE TABLE `sys_paras` (
   `paraCode` varchar(45) NOT NULL,
   `paraName` varchar(45) NOT NULL,
@@ -95,6 +102,7 @@ CREATE TABLE `sys_paras` (
   `remark` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`paraCode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+select CONCAT("insert into sys_paras ( paraCode, paraName, paraValue, remark ) values ( '", paraCode, "', '", paraName, "', '", paraValue, "', '", remark, "' );") from sys_paras;
 
 CREATE TABLE `oper_log` (
   `sID` int NOT NULL AUTO_INCREMENT,

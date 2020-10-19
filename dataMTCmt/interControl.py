@@ -145,7 +145,7 @@ class InterControl():
                     sInfo = ""
 
                     # 调试代码
-                    if rcCmt["commentID"] == 3706461169:
+                    if rcCmt["commentID"] == 3745759421:
                         iDebug = 0
 
                     # 时间范围匹配：评价起止时间范围
@@ -511,14 +511,16 @@ class InterControl():
         lTmp = []
 
         # 当天评价
-        if len(lTmp) == 0:
+        if len(lTmp) == 0 and 1==2:
+            # 该规则可靠度低，暂屏蔽
             lTmp = [i for i in lOrder if ( self._getDay(i["delivery_time"]) == self._getDay(tCmt))]
             sInfo += "X1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
             if len(lTmp) == 1:
                 lOrder = lTmp
 
         # 不同日期，日期相差不过7天，送达与评价绝对值相差指定时长内，只有一个订单
-        if len(lTmp) == 0:
+        if len(lTmp) == 0 and 1==2:
+            # 该规则可靠度低，暂屏蔽
             lTmp = [i for i in lOrder if (tCmt - i["delivery_time"] > 7 * 60 * 60 and tCmt - i["delivery_time"] < (7 * 24 + 1) * 60 * 60 and abs(tCmt % (24 * 60 * 60) - i["delivery_time"] % (24 * 60 * 60)) < 90 * 60)]
             sInfo += "X2-1:{num1}/{num2};".format(num1=len(lTmp), num2=iCnt)
             if len(lTmp) == 1:

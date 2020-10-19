@@ -25,6 +25,8 @@ class Handler(BaseHandler):
         }
         # 处理哪种状态的商家
         self.storeStatus = 1
+        self.modeDebug = True
+        self.logFile = "D:\python\proDataHandle\dataMTCmt\service.log"
     
     @every(minutes=4 * 60)
     def on_start(self):
@@ -168,34 +170,34 @@ class Handler(BaseHandler):
                     r"{ship_score}, {quality_score}, {pic_cnt}, {comment_time}, {data_time}, {to_time}, {ship_duration}, {over_duration}, '{consumerSName}', '{comment_str}' )".format(
                         commentID=cID,
                         storeID=each["wm_poi_id"],
-                        order_score=each["order_comment_score"],
-                        food_score=each["food_comment_score"],
-                        delivery_score=each["delivery_comment_score"],
-                        package_score=each["packaging_score"],
-                        taste_score=each["taste_score"],
-                        ship_score=each["ship_score"],
-                        quality_score=each["quality_score"],
-                        pic_cnt=len(each["picture_urls"]),
-                        comment_time=each["ctime"],
+                        order_score=each["order_comment_score"] if each["order_comment_score"] else 6,
+                        food_score=each["food_comment_score"] if each["food_comment_score"] else 6,
+                        delivery_score=each["delivery_comment_score"] if each["delivery_comment_score"] else 6,
+                        package_score=each["packaging_score"] if each["packaging_score"] else 6,
+                        taste_score=each["taste_score"] if each["taste_score"] else 6,
+                        ship_score=each["ship_score"] if each["ship_score"] else 6,
+                        quality_score=each["quality_score"] if each["quality_score"] else 6,
+                        pic_cnt=len(each["picture_urls"]) if len(each["picture_urls"]) else 0,
+                        comment_time=each["ctime"] if each["ctime"] else 0,
                         data_time=int(time.time()),
-                        to_time=each["ctime"],
-                        ship_duration=each["ship_time"],
-                        over_duration=each["overDeliveryTime"],
-                        consumerSName=each["username"],
-                        comment_str=str(each["comment"])
+                        to_time=each["ctime"] if each["ctime"] else 0,
+                        ship_duration=each["ship_time"] if each["ship_time"] else 0,
+                        over_duration=each["overDeliveryTime"] if each["overDeliveryTime"] else 0,
+                        consumerSName=each["username"] if each["username"] else '',
+                        comment_str=str(each["comment"]) if str(each["comment"]) else ''
                     )
                 self.data_handle(sSqlJ, False, sSqlH)
                 # 商品明细
                 if each["orderStatus"]["details"]:
                     self.detail_page_comment_detail(cID, each["wm_poi_id"], each["ctime"], 1, each["orderStatus"]["details"])
                     sSqlH = r"update comment_main set to_time = {to_time} where erpID = {commentID} and to_time > {to_time}".format(
-                            to_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60,
+                            to_time=int(time.time()) - (each["showOrderInfoTime"] if each["showOrderInfoTime"] else 48) * 60 * 60,
                             commentID=cID
                         )
                     self.data_handle("", False, sSqlH)
                 else:
                     sSqlH = r"update comment_main set from_time = {from_time} where erpID = {commentID} and from_time < {from_time}".format(
-                            from_time=int(time.time()) - each["showOrderInfoTime"] * 60 * 60 - 60,
+                            from_time=int(time.time()) - (each["showOrderInfoTime"] if each["showOrderInfoTime"] else 48) * 60 * 60 - 60,
                             commentID=cID
                         )
                     self.data_handle("", False, sSqlH)
@@ -221,14 +223,14 @@ class Handler(BaseHandler):
                 sSqlJ = r"select 1 from comment_detail where commentID = {commentID} and itemSource = {itemSource} and itemName = '{itemName}'".format(
                     commentID=commentID, 
                     itemSource=itemSource, 
-                    itemName=itemName
+                    itemName=itemName if itemName else ''
                 )
                 sSqlH = r"insert into comment_detail ( commentID, storeID, comment_time, itemSource, itemName ) values ( {commentID}, {storeID}, {comment_time}, {itemSource}, '{itemName}' )".format(
                     commentID=commentID, 
                     storeID=storeID, 
                     comment_time=comment_time, 
                     itemSource=itemSource, 
-                    itemName=itemName
+                    itemName=itemName if itemName else ''
                 )
                 self.data_handle(sSqlJ, False, sSqlH)
         except Exception as e:
@@ -284,6 +286,10 @@ class Handler(BaseHandler):
         sHandle——处理SQL语句
         """
         try:
+            if self.modeDebug:
+                with open(self.logFile, "w") as wf:
+                    sTime = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d %H:%M:%S")
+                    wf.write("{optime}:{opcontent}".format(optime=sTime, opcontent=sHandle))
             cur = self.db.cursor()
             cur.execute("set names utf8mb4")
             cur.execute("SET CHARACTER SET utf8mb4")

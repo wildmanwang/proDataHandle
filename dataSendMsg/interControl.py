@@ -249,7 +249,7 @@ if __name__ == "__main__":
     sPath = os.path.dirname(sPath)
     sett = Settings(sPath, "config")
     inter = InterControl(sett)
-    rtn = inter.dataHandle(0)
+    rtn = inter.dataHandle(9598509)
     print(rtn)
     rtn = inter.errLogSend()
     print(rtn)
